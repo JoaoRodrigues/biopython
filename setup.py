@@ -267,6 +267,7 @@ PACKAGES = [
     'BioSQL',
     # GSOC 2010 Packages
     'Bio.Struct',
+    'Bio.Struct.WWW',
     ]
 
 # packages that require Numeric Python
