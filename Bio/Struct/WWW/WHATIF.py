@@ -17,8 +17,10 @@ If you find any problem, please contact us.
 import urllib
 import os, tempfile, time
 from Bio.PDB.Entity import Entity
+from Bio.PDB import PDBIO
+import xml.dom.minidom
 
-# WHAT IF returns XML format
+# WHAT IF returns structures in XML format
 from WHATIFXML import XMLParser
 
 # Warning message to be outputted when experimental service is requested.
@@ -42,7 +44,7 @@ class WHATIF:
                     raise ConnectionError(  "WHATIF Server appears to be down.. \
                                             \nContact the Biopython developers if the problem persists.")
                 else:
-                    retry + = 1
+                    retry += 1
                     time.sleep(5*retry)
             else:
                 break # Up and running!
@@ -53,7 +55,7 @@ class WHATIF:
     
     
     # Utility functions
-    def smcra_to_str(self, smcra, temp_dir='/tmp/'):
+    def _smcra_to_str(self, smcra, temp_dir='/tmp/'):
         """
         WHATIF's input are PDB format files.
         Converts a SMCRA object to a PDB formatted string.
@@ -74,8 +76,7 @@ class WHATIF:
         return string
 
         
-    
-    def str_to_smcra(self, string, temp_dir='/tmp/'):
+    def _str_to_smcra(self, string, temp_dir='/tmp/'):
         
         temp_path = tempfile.mktemp( '.pdb', dir=temp_dir )
         f = open(temp_path, 'r')
@@ -83,7 +84,7 @@ class WHATIF:
         f.close()
         
         p = PDBParser()
-        s = p.get_structure(temp_path)
+        s = p.get_structure('structure', temp_path)
  
         os.remove(temp_path)
         
@@ -98,7 +99,7 @@ class WHATIF:
         # MISSING!
         # Returns self.alive (bool)
         self.alive = True
-        return 
+        return True
     
     
     def UploadPDB(self, structure):
@@ -110,27 +111,27 @@ class WHATIF:
         
         if isinstance(structure, Entity): # SMCRA
             s = self._smcra_to_str(structure)
+
         elif isinstance(structure, str): # String
             s = structure
-        
+
         u = urllib.urlopen("http://www.cmbi.ru.nl/wiwsd/rest/UploadPDB", s)
         x = xml.dom.minidom.parse(u)
         
-        self.id = x.getElementsByTagName("response")[0].childNodes[0].data
+        id = x.getElementsByTagName("response")[0].childNodes[0].data
+
+        return id
         
-        return self.id
         
-        
-    def PDBasXMLwithSymwithPolarH(self):
+    def PDBasXMLwithSymwithPolarH(self, id):
         """
         Adds Hydrogen Atoms to a Structure.
         """
         
         print _WARNING
-        
         # Protonated Structure in XML Format
-        h_s_xml = urllib.urlopen("http://www.cmbi.ru.nl/wiwsd/rest/PDBasXMLwithSymwithPolarH/id/" + self.id)
-        
+        h_s_xml = urllib.urlopen("http://www.cmbi.ru.nl/wiwsd/rest/PDBasXMLwithSymwithPolarH/id/" + id)
+
         p = self.parser
         h_s_smcra = p.read(h_s_xml, 'WHATIF_Output')
         

@@ -9,6 +9,8 @@ import xml.dom.minidom
 from Bio.PDB.StructureBuilder import StructureBuilder
 from Bio.PDB.PDBExceptions import PDBConstructionException, PDBConstructionWarning
 
+from Bio.PDB.Atom import Atom # for single atom additions
+
 __doc__="Parser for WHATIF server XML Structure format."
 
 
@@ -20,6 +22,7 @@ __doc__="Parser for WHATIF server XML Structure format."
 # ie. not suitable for general wide use of PDB XML parsing..
 
 # Allowed AA List for HETATM distinguishing.
+# N_TERMINAL_ATOMS and C_TERMINAL_ATOMS for correct atom attribution
 
 AA_LIST = set([ 'ILE', 'GLN', 'GLY', 'GLP', 'GLU', 
                 'CYS', 'ASP', 'LYS', 'PRO', 'CYX', 
@@ -27,6 +30,12 @@ AA_LIST = set([ 'ILE', 'GLN', 'GLY', 'GLP', 'GLU',
                 'HIP', 'VAL', 'THR', 'TRP', 'SER', 
                 'PHE', 'ALA', 'MET', 'LEU', 'ARG', 
                 'HIS', 'TYR'])
+
+N_TERMINAL_ATOMS = set(['HT','HT1','HT2','HT3','H1','H2','H3',
+                          '1H','2H','3H','1HT','2HT','3HT'])
+
+C_TERMINAL_ATOMS = set(['OXT','O2','OT1','OT2'])
+
 
 class ParserException(Exception):
     pass
@@ -45,8 +54,7 @@ class XMLParser:
         try:
             self.handle = xml.dom.minidom.parse(f)
         except xml.parsers.expat.ExpatError, e:
-            raise XMLError(e)
-            sys.exit(0)
+            self._handle_parser_exception(e)
         
         self.structure_builder.init_structure(id)
         
@@ -74,7 +82,9 @@ class XMLParser:
         """
         Parse atomic data of the XML file.
         """
-    
+        
+        atom_counter = 0
+        
         structure_build = self.structure_builder
         
         residues = self._extract_residues()
@@ -108,8 +118,12 @@ class XMLParser:
                 hetero_flag = 'W'
             else:
                 hetero_flag = 'H'
-                
-            if len(r['atoms']):
+            
+            # Some terminal atoms are added at residue 0. This residue has a small number of atoms.
+            # Protonated non-terminal glycine has 7 atoms. Any of these residues is smaller.
+            # HETATMs have only a couple of atoms (3 for water for example) and they are ok.
+            
+            if (len(r['atoms']) >= 7) or (hetero_flag != " "):
                 try:
                     structure_build.init_residue(r['name'], hetero_flag, r['number'], r['icode'])
                 except PDBConstructionException, message:
@@ -118,21 +132,61 @@ class XMLParser:
                 # Create Atoms
                 for atom in r['atoms']:
                     a = self._parse_atom(atom)
-                    
+
                     if not sum(a['coord']): # e.g. HG of metal bound CYS coords are 0,0,0.
                         continue
                         
                     try:
+                        atom_counter += 1
                         # fullname = name; altloc is empty;
                         structure_build.init_atom(a['name'], a['coord'], a['bfactor'], a['occupancy'], ' ',
-                                                    a['name'], hetero_flag, a['number'], a['element'])
+                                                    a['name'], hetero_flag, atom_counter, a['element'])
                     except PDBConstructionException, message:
                         self._handle_builder_exception(message, r)      
+            
+            elif len(r['atoms']) < 7: # Terminal Residues
+                                
+                for atom in r['atoms']:
+                    
+                    a = self._parse_atom(atom)
+                    
+                    if not sum(a['coord']): # e.g. HG of metal bound CYS coords are 0,0,0.
+                        continue
 
-    
+                    atom_counter += 1                    
+                    ter_atom = Atom(    a['name'], a['coord'], a['bfactor'], a['occupancy'], ' ',
+                                        a['name'], hetero_flag, atom_counter, a['element']           )
+                    
+                    if a['name'] in N_TERMINAL_ATOMS:
+                        
+                        inc_struct = self.structure_builder.get_structure()
+                        for model in inc_struct:
+                            for chain in model:
+                                if chain.id == r['chain']:
+                                    for residue in chain: # Find First residue matching name
+                                        if residue.resname == r['name']:
+                                            residue.add(ter_atom)
+                                            break
+                    
+                    elif a['name'] in C_TERMINAL_ATOMS:
+
+                        inc_struct = self.structure_builder.get_structure()
+                        c_ter = None
+                        for model in inc_struct:
+                            for chain in model:
+                                if chain.id == r['chain']:
+                                    for residue in chain: # Find Last residue matching name
+                                        if residue.resname == r['name']:
+                                            c_ter = residue
+                                    if c_ter:
+                                        c_ter.add(ter_atom)
+                    
+                    # Else, discard atom...
+                    
+
     def _extract_residues(self):
         """
-        WHAT IF puts residues at the end for some reason..
+        WHAT IF puts terminal atoms in new residues at the end for some reason..
         """        
         
         r_list = self.handle.getElementsByTagName("response")
@@ -142,10 +196,9 @@ class XMLParser:
         for r in r_list:
             data = self._parse_residue(r)
             res_id = (data['model'], data['chain'], data['number']) # (A, 1, 1), (A, 1, 2), ...
-            
             if not r_data.has_key(res_id):
                 r_data[res_id] = data
-            else:
+            else: # Some atoms get repeated at the end with TER Hydrogens/oxygens
                 r_data[res_id]['atoms'] += data['atoms'] # Append Atoms
         
         for key in sorted(r_data.keys()):
@@ -161,9 +214,8 @@ class XMLParser:
         childs = [ child for child in residue.childNodes if child.nodeType == child.ELEMENT_NODE ]
         
         # Parse info out
-        
+        resi = int(childs[0].firstChild.data.strip())
         resn = childs[1].firstChild.data.strip()
-        resi = int(childs[2].firstChild.data.strip())
         icode = childs[3].firstChild.data
         chain = childs[4].firstChild.data.strip()
         model = int(childs[5].firstChild.data.strip())
