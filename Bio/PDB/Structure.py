@@ -55,7 +55,7 @@ class Structure(Entity):
                 yield a
 
     def renumber_model(self):
-        """ Renumbers residues in a structure starting from 1. Keeps gaps."""
+        """ Renumbers residues in a structure starting from 1. Keeps numbering consistent with gaps."""
         
         for m in self:
             for c in m:
@@ -63,4 +63,19 @@ class Structure(Entity):
                 displace = 1 - start
                 for r in c:
                     r.id = (r.id[0], r.id[1]+displace, r.id[2])
+    
+    def get_ss_bonds(self, threshold=2.2):
+        """ Finds S-S bonds based on distances between atoms in the structure.
+            Optimal distance is 2.05A. Threshold is 2.2A for lax.
+        """
 
+        from itertools import combinations
+        
+        cysteines = filter( (lambda r: r.get_resname() == 'CYS'), self.get_residues() )
+        
+        pairs = combinations(cysteines, 2) # Iterator with pairs
+        
+        for cys_pair in pairs:
+            if cys_pair[0]['SG'] - cys_pair[1]['SG'] < threshold:
+                yield cys_pair
+        
