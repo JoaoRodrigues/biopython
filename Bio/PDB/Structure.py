@@ -54,13 +54,15 @@ class Structure(Entity):
             for a in r:
                 yield a
 
-    def renumber_model(self):
-        """ Renumbers residues in a structure starting from 1. Keeps numbering consistent with gaps."""
+    def renumber_residues(self, start=1):
+        """ Renumbers residues in a structure starting from 1. 
+            Keeps numbering consistent with gaps.
+        """
         
         for m in self:
             for c in m:
-                start = c.get_list()[0].get_id()[1]
-                displace = 1 - start
+                fresidue_num = c.get_list()[0].get_id()[1]
+                displace = start - fresidue_num
                 for r in c:
                     r.id = (r.id[0], r.id[1]+displace, r.id[2])
     
@@ -78,4 +80,7 @@ class Structure(Entity):
         for cys_pair in pairs:
             if cys_pair[0]['SG'] - cys_pair[1]['SG'] < threshold:
                 yield cys_pair
-        
+    
+    def extract_biological_unit(self):
+        """
+        """
