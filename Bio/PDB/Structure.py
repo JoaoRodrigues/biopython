@@ -66,21 +66,37 @@ class Structure(Entity):
                 for r in c:
                     r.id = (r.id[0], r.id[1]+displace, r.id[2])
     
-    def get_ss_bonds(self, threshold=2.2):
-        """ Finds S-S bonds based on distances between atoms in the structure.
-            Optimal distance is 2.05A. Threshold is 2.2A for lax.
+    def search_ss_bonds(self, threshold=3):
+        """ Searches S-S bonds based on distances between atoms in the structure (first model only).
+            Average distance is 2.05A. Threshold is 3A default.
         """
 
         from itertools import combinations
         
-        cysteines = filter( (lambda r: r.get_resname() == 'CYS'), self.get_residues() )
+        model = self.child_list[0]
+        cysteines = filter( (lambda r: r.get_resname() == 'CYS'), model.get_residues() )
         
         pairs = combinations(cysteines, 2) # Iterator with pairs
         
         for cys_pair in pairs:
             if cys_pair[0]['SG'] - cys_pair[1]['SG'] < threshold:
                 yield cys_pair
-    
-    def extract_biological_unit(self):
+        
+    def build_biological_unit(self):
         """
         """
+        
+        from copy import deepcopy # To copy structure object
+        
+        if self.header['biological_unit']:
+            biomt_data = self.header['biological_unit']
+        else:
+            return "PDB File lacks appropriate REMARK 350 entries to build Biological Unit."
+        
+        for transformation in biomt_data:
+            M = transformation[0] # Rotation Matrix
+            T = transformation[1] # Translation Vector
+                      
+            for atom in rot_struct:
+                atom.transform(M, T)
+                
