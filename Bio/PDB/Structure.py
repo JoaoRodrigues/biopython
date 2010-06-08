@@ -83,7 +83,8 @@ class Structure(Entity):
                 yield cys_pair
         
     def build_biological_unit(self):
-        """
+        """ Uses information from header to build full biological unit assembly.
+            Each new subunit is added to the structure as a new MODEL record.
         """
         
         from copy import deepcopy # To copy structure object
@@ -92,11 +93,22 @@ class Structure(Entity):
             biomt_data = self.header['biological_unit']
         else:
             return "PDB File lacks appropriate REMARK 350 entries to build Biological Unit."
+
+        temp = [] # container for new models
+        seed = 0 # Seed for model numbers
         
         for transformation in biomt_data:
-            M = transformation[0] # Rotation Matrix
-            T = transformation[1] # Translation Vector
-                      
-            for atom in rot_struct:
+            M = [i[:-1] for i in transformation] # Rotation Matrix
+            T = [i[-1] for i in transformation] # Translation Vector
+            
+            model = deepcopy(self.child_list[0]) # Bottleneck...
+            seed += 1
+            model.id = seed
+            
+            for atom in model.get_atoms():
                 atom.transform(M, T)
                 
+            temp.append(model)
+        # Add chain to structure object
+        map(self.add, temp)
+        return "Processed %s transformations on the structure." %seed 

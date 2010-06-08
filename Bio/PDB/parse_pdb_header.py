@@ -251,10 +251,10 @@ def _parse_pdb_header_list(header):
             elif re.search("REMARK 350   BIOMT.", hh):
                 tokens = hh.split()
                 if tokens[3] == curTrans:
-                    # builds list of [rot_matrix, transl_vector] for BIOMTX record
-                    dict['biological_unit'][-1].append([ map(float, tokens[4:-1]), float(tokens[-1]) ])
+                    # builds list of [rot_matrix, transl_vector] from BIOMTx record
+                    dict['biological_unit'][-1].append(map(float, tokens[4:]))
                 else:
-                    dict['biological_unit'].append( [ map(float, tokens[4:-1]), float(tokens[-1]) ])
+                    dict['biological_unit'].append([map(float, tokens[4:])])
                     curTrans = tokens[3]
         else:
             # print key
