@@ -66,9 +66,10 @@ class Structure(Entity):
                 for r in c:
                     r.id = (r.id[0], r.id[1]+displace, r.id[2])
     
-    def search_ss_bonds(self, threshold=3):
+    def search_ss_bonds(self, threshold=3.0):
         """ Searches S-S bonds based on distances between atoms in the structure (first model only).
             Average distance is 2.05A. Threshold is 3A default.
+            Returns iterator with tuples of residues.
         """
 
         from itertools import combinations
@@ -90,7 +91,7 @@ class Structure(Entity):
         from copy import deepcopy # To copy structure object
         
         if self.header['biological_unit']:
-            biomt_data = self.header['biological_unit']
+            biomt_data = self.header['biological_unit'][1:] # 1st is identity
         else:
             return "PDB File lacks appropriate REMARK 350 entries to build Biological Unit."
 
@@ -109,6 +110,6 @@ class Structure(Entity):
                 atom.transform(M, T)
                 
             temp.append(model)
-        # Add chain to structure object
+        # Add MODELs to structure object
         map(self.add, temp)
         return "Processed %s transformations on the structure." %seed 
