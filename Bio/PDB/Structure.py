@@ -54,38 +54,31 @@ class Structure(Entity):
             for a in r:
                 yield a
 
-    def renumber_residues(self, start=1):
-        """ Renumbers residues in a structure starting from 1. 
-            Keeps numbering consistent with gaps.
+    def as_protein(self):
+        """ Exposes methods in the Bio.Struct.Protein module.
+            Returns a new structure object.
+        """
+        
+        from Bio.Struct.Protein import Protein
+        prot = Protein(self)
+        return prot
+        
+    def renumber_residues(self, begin=1):
+        """ Renumbers residues in a structure starting from begin (default: 1). 
+            Keeps numbering consistent with gaps if they exist in the original numbering.
         """
         
         for m in self:
             for c in m:
                 fresidue_num = c.get_list()[0].get_id()[1]
-                displace = start - fresidue_num
+                displace = begin - fresidue_num
                 for r in c:
                     r.id = (r.id[0], r.id[1]+displace, r.id[2])
-    
-    def search_ss_bonds(self, threshold=3.0):
-        """ Searches S-S bonds based on distances between atoms in the structure (first model only).
-            Average distance is 2.05A. Threshold is 3A default.
-            Returns iterator with tuples of residues.
-        """
-
-        from itertools import combinations
-        
-        model = self.child_list[0]
-        cysteines = filter( (lambda r: r.get_resname() == 'CYS'), model.get_residues() )
-        
-        pairs = combinations(cysteines, 2) # Iterator with pairs
-        
-        for cys_pair in pairs:
-            if cys_pair[0]['SG'] - cys_pair[1]['SG'] < threshold:
-                yield cys_pair
         
     def build_biological_unit(self):
         """ Uses information from header to build full biological unit assembly.
             Each new subunit is added to the structure as a new MODEL record.
+            Identity matrix is ignored.
         """
         
         from copy import deepcopy # To copy structure object
@@ -112,4 +105,4 @@ class Structure(Entity):
             temp.append(model)
         # Add MODELs to structure object
         map(self.add, temp)
-        return "Processed %s transformations on the structure." %seed 
+        return "Processed %s transformations on the structure." %seed
