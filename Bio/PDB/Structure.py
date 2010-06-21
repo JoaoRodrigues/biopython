@@ -54,14 +54,16 @@ class Structure(Entity):
             for a in r:
                 yield a
 
-    def as_protein(self):
+    def as_protein(self, filter_residues=True):
         """ Exposes methods in the Bio.Struct.Protein module.
+            Parameters:
+                - filter_residues boolean; removes non-aa residues through Bio.PDB.Polypeptide is_aa function
+                  [Default: True]
             Returns a new structure object.
         """
         
         from Bio.Struct.Protein import Protein
-        prot = Protein(self)
-        return prot
+        return Protein.from_structure(self, filter_residues)
         
     def renumber_residues(self, begin=1):
         """ Renumbers residues in a structure starting from begin (default: 1). 
