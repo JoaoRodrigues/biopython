@@ -9,6 +9,7 @@ import numpy
 # My stuff
 from Entity import DisorderedEntityWrapper
 from Vector import Vector
+from Bio.Data import IUPACData
 
 __doc__="Atom class, used in Structure objects."
 
@@ -74,6 +75,9 @@ class Atom:
         elif len(element)>2 or element != element.upper() or element != element.strip():
             raise ValueError(element)
         self.element=element
+        
+        # Added by Joao for C.O.M. purposes
+        self.mass = IUPACData.atom_weigths[element]
         
     # Special methods   
 
