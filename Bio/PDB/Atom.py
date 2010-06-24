@@ -77,7 +77,7 @@ class Atom:
             import warnings
             from PDBExceptions import PDBConstructionWarning
             warnings.warn("Atom object (name=%s) without element or element not recognized (%s)" % (name, element),
-                          # PDBConstructionWarning)
+                          PDBConstructionWarning)
             
             # Try to get element from atom name
             # HETATM check to clear ambiguities (CA: calcium, c/alpha ; HG: mercury, gamma hydrogen ; etc)
