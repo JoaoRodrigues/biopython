@@ -153,7 +153,6 @@ class PDBIO:
                         if select.accept_atom(atom):
                             chain_residues_written=1
                             model_residues_written=1
-                            print atom
                             s=get_atom_line(atom, hetfield, segid, atom_number, resname,
                                 resseq, icode, chain_id)
                             fp.write(s)

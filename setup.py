@@ -265,6 +265,8 @@ PACKAGES = [
     'Bio.Wise',
     #Other top level packages,
     'BioSQL',
+    # GSOC 2010 Packages
+    'Bio.Struct',
     ]
 
 # packages that require Numeric Python

@@ -77,7 +77,7 @@ class Atom:
         self.element=element
         
         # Added by Joao for C.O.M. purposes
-        # self.mass = IUPACData.atom_weigths[element]
+        self.mass = IUPACData.atom_weigths[element]
         
     # Special methods   
 
