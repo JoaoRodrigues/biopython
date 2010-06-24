@@ -29,6 +29,13 @@ def center_of_mass(entity, geometric=False):
         for i, coord in enumerate(atom.coord.tolist()):
             pos[i].append(coord)
     
+    if '?' in set(masses): # If there is a single atom with undefined mass, default to Geometric
+        geometric = True
+        import warnings
+        from PDBExceptions import PDBConstructionWarning
+        warnings.warn("Some atoms have undefined masses. Calculating Geometric Center of Mass instead.",
+                      PDBConstructionWarning)
+    
     if geometric:
         return map( lambda y: sum(y)/len(masses), pos)
     else:
