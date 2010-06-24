@@ -14,7 +14,7 @@ from Bio.Data import IUPACData
 __doc__="Atom class, used in Structure objects."
 
 class Atom:
-    def __init__(self, name, coord, bfactor, occupancy, altloc, fullname, serial_number,
+    def __init__(self, name, coord, bfactor, occupancy, altloc, fullname, hetero_flag, serial_number,
                  element=None):
         """
         Atom object.
@@ -45,6 +45,9 @@ class Atom:
 
         @param element: atom element, e.g. "C" for Carbon, "HG" for mercury,
         @type fullname: uppercase string (or None if unknown)
+
+        @param hetero_flag: ATOM/HETATM source,
+        @type hetero_flag: string, empty if ATOM, otherwise HETATM. e.g. " " for CA (C-alpha), "H" for HG (mercury)        
         """
         self.level="A"
         # Reference to the residue 
@@ -65,19 +68,37 @@ class Atom:
         self.serial_number=serial_number
         # Dictionary that keeps addictional properties
         self.xtra={}
-        if not element:
+        
+        # Is HETATM?
+        self.hetatm = False if hetero_flag == " " else True
+
+        # Atom Element
+        if not element or not IUPACData.atom_weigths.has_key(element):
             import warnings
             from PDBExceptions import PDBConstructionWarning
-            warnings.warn("Atom object (name=%s) without element" % name,
-                          PDBConstructionWarning)
-            element = "?"
-            print name, "--> ?"
-        elif len(element)>2 or element != element.upper() or element != element.strip():
-            raise ValueError(element)
+            warnings.warn("Atom object (name=%s) without element or element not recognized (%s)" % (name, element),
+                          # PDBConstructionWarning)
+            
+            # Try to get element from atom name
+            # HETATM check to clear ambiguities (CA: calcium, c/alpha ; HG: mercury, gamma hydrogen ; etc)
+            if self.hetatm:
+                putative_element = self.name
+            else:
+                putative_element = self.name[0] if not self.name[0].isdigit() else self.name[1] # Hs may have digit in [0]
+            
+            if IUPACData.atom_weigths.has_key(putative_element):
+                warnings.warn("Atom object (name=%s) assigned element %s based on atom name" % (name, putative_element),
+                               PDBConstructionWarning)
+                element = putative_element
+            else:
+                warnings.warn("Atom object (name=%s) element could not be assigned" % (name),
+                               PDBConstructionWarning)
+                element = "?"
+
         self.element=element
-        
+
         # Added by Joao for C.O.M. purposes
-        self.mass = IUPACData.atom_weigths[element]
+        self.mass = IUPACData.atom_weigths[self.element]
         
     # Special methods   
 
