@@ -95,6 +95,7 @@ class WHATIF:
         Test Function to check WHAT IF servers are up and running.
         """
         
+        # MISSING!
         # Returns self.alive (bool)
         self.alive = True
         return 
