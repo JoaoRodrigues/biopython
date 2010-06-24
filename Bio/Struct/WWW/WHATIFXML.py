@@ -123,9 +123,9 @@ class XMLParser:
                         continue
                         
                     try:
-                        # fullname = name; altloc is empty
+                        # fullname = name; altloc is empty;
                         structure_build.init_atom(a['name'], a['coord'], a['bfactor'], a['occupancy'], ' ',
-                                                    a['name'], a['number'], a['element'])
+                                                    a['name'], hetero_flag, a['number'], a['element'])
                     except PDBConstructionException, message:
                         self._handle_builder_exception(message, r)      
 
