@@ -108,3 +108,51 @@ class Structure(Entity):
         # Add MODELs to structure object
         map(self.add, temp)
         return "Processed %s transformations on the structure." %seed
+    
+    def remove_disordered_atoms(self, keep_loc='A', verbose=True):
+        """
+        Substitutes DisorderedAtom objects for Atom object. 
+        Choice of Atom to keep defined by keep_loc argument.
+        
+        Originally based on the solution by Ramon Crehuet in the Biopython Wiki.
+        http://www.biopython.org/wiki/Remove_PDB_disordered_atoms
+        
+        Arguments:
+        
+        - keep_loc, string, alternate location to keep (A has the highest occupancy). [A is default]
+        - verbose, boolean, if True outputs info on each DisorderedAtom found.
+        
+        """
+        
+        substitutions = 0
+        
+        for residue in self.get_residues():
+
+            disordered = [a for a in residue if a.is_disordered()]
+            
+            if disordered:
+                
+                substitutions += 1
+                
+                if verbose:
+                    print "Residue %s:%s has %s disordered atoms: %s" %(   residue.resname, residue.get_id()[1],
+                                                                            len(disordered), 
+                                                                            '/'.join([ d.name for d in disordered ])
+                                                                        )
+            
+                for atom in disordered:
+                    try:
+                        a = atom.disordered_get(keep_loc)
+                    except KeyError: # Descriptive Enough
+                        print "Atomic Position %s not found for %s (%s:%s)" %(  keep_loc, 
+                                                                                atom, 
+                                                                                residue.resname, 
+                                                                                residue.get_id()[1])
+                        continue
+                
+                    a.disordered_flag = 0
+                    residue.detach_child(atom.name)
+                    residue.add(a)
+        
+        if verbose: 
+            print "%s residues were modified" %substitutions
