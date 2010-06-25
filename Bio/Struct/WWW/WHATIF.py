@@ -96,10 +96,11 @@ class WHATIF:
         Test Function to check WHAT IF servers are up and running.
         """
         
-        # MISSING!
-        # Returns self.alive (bool)
-        self.alive = True
-        return True
+        u = urllib.urlopen("http://wiws.cmbi.ru.nl/rest/TestEmpty/id/1crn/")
+        x = xml.dom.minidom.parse(u)
+        self.alive = len(x.getElementsByTagName("TestEmptyResponse"))
+
+        return self.alive
     
     
     def UploadPDB(self, structure):
