@@ -107,7 +107,7 @@ class Structure(Entity):
             temp.append(model)
         # Add MODELs to structure object
         map(self.add, temp)
-        return "Processed %s transformations on the structure." %seed
+        return seed
     
     def remove_disordered_atoms(self, keep_loc='A', verbose=False):
         """
@@ -154,5 +154,4 @@ class Structure(Entity):
                     residue.detach_child(atom.name)
                     residue.add(a)
         
-        if verbose: 
-            print "%s residues were modified" %substitutions
+        return substitutions
