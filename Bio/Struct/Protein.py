@@ -56,6 +56,48 @@ class Protein(Structure):
             if cys_pair[0]['SG'] - cys_pair[1]['SG'] < threshold:
                 yield cys_pair
     
+    def check_missing_atoms(self, template=None, ha_only=True):
+        """
+        Checks for missing atoms based on a template.
+        Default: Searches for missing heavy atoms (not Hydrogen) based on Bio.Struct.protein_residues
+        
+        Arguments:
+          - template, dictionary, keys are residue names, values list of atom names.
+          - ha_only, boolean, default True, restrict check to heavy atoms.
+          
+        Returns a dictionary of tuples with the missing atoms per residue.
+        """
+        
+        missing_atoms = {}
+        
+        if not template:
+            import protein_residues
+            template = protein_residues.normal # Don't care for terminal residues here..
+            
+        for residue in self.get_residues():
+            
+            if not template.has_key(residue.resname):
+                # Maybe add this as a warning instead of exception?
+                raise ValueError('Residue name (%s) not in the template' %residue.resname )
+            
+            if ha_only:
+                heavy_atoms = [ atom for atom in template[residue.resname]['atoms'].keys() 
+                                if atom[0] != 'H' and not (atom[0].isdigit() and atom[1] == 'H')]
+                reference_set = set(heavy_atoms)
+            else:
+                reference_set = set(template[residue.resname]['atoms'].keys())
+            
+            structure_set = set(residue.child_dict.keys())
+            
+            diff = reference_set.difference(structure_set)
+            
+            if diff:
+                residue_uniq_id = (residue.parent.id, residue.resname, residue.get_id()[1]) # Chain, Name, Number
+                missing_atoms[residue_uniq_id] = list(diff)
+        
+        return missing_atoms
+        
+    
     def coarse_grain(self, cg_type="CA"):
         """ 
             Reduces the protein structure complexity to a few atoms per residue.
@@ -69,7 +111,7 @@ class Protein(Structure):
     
         from Bio.Struct.Geometry import center_of_mass
     
-        entity = deepcopy(self)
+        entity = deepcopy(self.child_list[0]) # First model
         
         residue_list = entity.get_residues()
         
@@ -106,13 +148,13 @@ class Protein(Structure):
                 elif len(side_chain_atoms) > 1:
                     sc_com_coord = center_of_mass(side_chain_atoms)
                     if residue.resname in ['GLU', 'ASP']:
-                        sc_com = Atom('CMA', sc_com_coord, 0, 0, ' ', 'CMA', 0, 'O', " ")
+                        sc_com = Atom('CMA', sc_com_coord, 0, 0, ' ', 'CMA', 0, 'O')
                     elif residue.resname in ['LYS', 'ARG', 'HIS']:
-                        sc_com = Atom('CMA', sc_com_coord, 0, 0, ' ', 'CMA', 0, 'N', " ")
+                        sc_com = Atom('CMA', sc_com_coord, 0, 0, ' ', 'CMA', 0, 'N')
                     elif residue.resname == 'CYS':
-                        sc_com = Atom('CMA', sc_com_coord, 0, 0, ' ', 'CMA', 0, 'S', " ")
+                        sc_com = Atom('CMA', sc_com_coord, 0, 0, ' ', 'CMA', 0, 'S')
                     else:
-                        sc_com = Atom('CMA', sc_com_coord, 0, 0, ' ', 'CMA', 0, 'C', " ")
+                        sc_com = Atom('CMA', sc_com_coord, 0, 0, ' ', 'CMA', 0, 'C')
 
                     residue.add(sc_com)
                           
