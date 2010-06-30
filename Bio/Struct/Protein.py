@@ -106,13 +106,13 @@ class Protein(Structure):
                 elif len(side_chain_atoms) > 1:
                     sc_com_coord = center_of_mass(side_chain_atoms)
                     if residue.resname in ['GLU', 'ASP']:
-                        sc_com = Atom('CMA', sc_com_coord, 0, 0, ' ', 'CMA', " ", 0, 'O')
+                        sc_com = Atom('CMA', sc_com_coord, 0, 0, ' ', 'CMA', 0, 'O', " ")
                     elif residue.resname in ['LYS', 'ARG', 'HIS']:
-                        sc_com = Atom('CMA', sc_com_coord, 0, 0, ' ', 'CMA', " ", 0, 'N')
+                        sc_com = Atom('CMA', sc_com_coord, 0, 0, ' ', 'CMA', 0, 'N', " ")
                     elif residue.resname == 'CYS':
-                        sc_com = Atom('CMA', sc_com_coord, 0, 0, ' ', 'CMA', " ", 0, 'S')
+                        sc_com = Atom('CMA', sc_com_coord, 0, 0, ' ', 'CMA', 0, 'S', " ")
                     else:
-                        sc_com = Atom('CMA', sc_com_coord, 0, 0, ' ', 'CMA', " ", 0, 'C')
+                        sc_com = Atom('CMA', sc_com_coord, 0, 0, ' ', 'CMA', 0, 'C', " ")
 
                     residue.add(sc_com)
                           

@@ -140,7 +140,7 @@ class XMLParser:
                         atom_counter += 1
                         # fullname = name; altloc is empty;
                         structure_build.init_atom(a['name'], a['coord'], a['bfactor'], a['occupancy'], ' ',
-                                                    a['name'], hetero_flag, atom_counter, a['element'])
+                                                    a['name'], atom_counter, a['element'],  hetero_flag)
                     except PDBConstructionException, message:
                         self._handle_builder_exception(message, r)      
             
@@ -154,8 +154,8 @@ class XMLParser:
                         continue
 
                     atom_counter += 1                    
-                    ter_atom = Atom(    a['name'], a['coord'], a['bfactor'], a['occupancy'], ' ',
-                                        a['name'], hetero_flag, atom_counter, a['element']           )
+                    ter_atom = Atom(a['name'], a['coord'], a['bfactor'], a['occupancy'], ' ',
+                                    a['name'], atom_counter, a['element'], hetero_flag)
                     
                     if a['name'] in N_TERMINAL_ATOMS:
                         

@@ -93,7 +93,7 @@ class MMCIFParser:
                     icode)
             coord=numpy.array((x, y, z), 'f')  
             structure_builder.init_atom(name, coord, bfactor, occupancy, altloc,
-                                        fullname, hetatm_flag, serial_number, element)   
+                                        fullname, serial_number, element, hetatm_flag)   
             if aniso_flag==1:
                 u=(aniso_u11[i], aniso_u12[i], aniso_u13[i],
                     aniso_u22[i], aniso_u23[i], aniso_u33[i])

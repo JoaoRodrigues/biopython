@@ -158,8 +158,8 @@ class StructureBuilder:
         self.chain.add(residue)
         self.residue=residue
 
-    def init_atom(self, name, coord, b_factor, occupancy, altloc, fullname, hetero_flag,
-                  serial_number=None, element=None):
+    def init_atom(self, name, coord, b_factor, occupancy, altloc, fullname,
+                  serial_number=None, element=None, hetero_flag=" "):
         """
         Initiate a new Atom object.
 
@@ -197,7 +197,7 @@ class StructureBuilder:
                                          self.line_counter),
                                       PDBConstructionWarning)
         atom=self.atom=Atom(name, coord, b_factor, occupancy, altloc,
-                            fullname, hetero_flag, serial_number, element)
+                            fullname, serial_number, element, hetero_flag)
         if altloc!=" ":
             # The atom is disordered
             if residue.has_id(name):

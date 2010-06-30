@@ -14,8 +14,8 @@ from Bio.Data import IUPACData
 __doc__="Atom class, used in Structure objects."
 
 class Atom:
-    def __init__(self, name, coord, bfactor, occupancy, altloc, fullname, hetero_flag, serial_number,
-                 element=None):
+    def __init__(self, name, coord, bfactor, occupancy, altloc, fullname, serial_number,
+                 element=None, hetero_flag=' '):
         """
         Atom object.
 
@@ -47,7 +47,7 @@ class Atom:
         @type fullname: uppercase string (or None if unknown)
 
         @param hetero_flag: ATOM/HETATM source,
-        @type hetero_flag: string, empty if ATOM, otherwise HETATM. e.g. " " for CA (C-alpha), "H" for HG (mercury)        
+        @type hetero_flag: string, ' ' if ATOM, otherwise HETATM. e.g. " " for CA (C-alpha), "H" for HG (mercury)        
         """
         self.level="A"
         # Reference to the residue 

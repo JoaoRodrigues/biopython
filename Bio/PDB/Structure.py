@@ -109,7 +109,7 @@ class Structure(Entity):
         map(self.add, temp)
         return "Processed %s transformations on the structure." %seed
     
-    def remove_disordered_atoms(self, keep_loc='A', verbose=True):
+    def remove_disordered_atoms(self, keep_loc='A', verbose=False):
         """
         Substitutes DisorderedAtom objects for Atom object. 
         Choice of Atom to keep defined by keep_loc argument.
