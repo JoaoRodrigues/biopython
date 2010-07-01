@@ -158,16 +158,223 @@ The schedule below was organised to be flexible, which means that some features 
 
 ====  Reviewing documentation, code, write tests for new functions. ====
 
-** Same Charge contacts
-** Atom Clashes
-:Via ResidueDepth Class
-** Buried Charges
-*Interface WHATIF PDBReport web service
-** Parse WARNING and ERROR messages
+== Project Code ==
+
+Hosted at [http://github.com/JoaoRodrigues/biopython/tree/GSOC2010 this GitHub branch]
+
+== Project Progress ==
+
+Since I'm adding some methods that are useful/logical only for proteins, having them exposed in Structure.py for every molecule could be misleading. We decided then to add a 'as_protein()' method that allows protein-specific methods to be accessed. The following example demonstrates how this call works. Note how the "search_ss_bonds" method is absent from dir(s) but not from dir(prot).
+
+<python>
+from Bio.PDB import PDBParser
+
+p = PDBParser()
+s = p.get_structure('example', '4PTI.pdb')
+
+dir(s)
+# Cut for viewing purposes
+['__doc__', ... , 'renumber_residues', 'set_parent', 'xtra']
+
+prot = s.as_protein()
+
+dir(prot)
+
+['__doc__', ... , 'renumber_residues', 'search_ss_bonds', 'set_parent', 'xtra']
+</python>
+
+=== Week 1 ===
 
 
-=== Week 11 [10th - 17th August] === 
+==== Renumbering residues of a structure ====
+
+Since parse_pdb_header is far from optimal and is likely to change in the future, I opted to forfeit reading SEQREQ records to account for gaps. However, ignoring this information and renumbering based on ATOM records would make us lose information on gaps. I opted to subtract the first residue number-1 to all residues thus making the numbering start in 1 and still keep gaps. I also added an argument (start) to allow the user to set which number to start the counting from.
+
+Example:
+
+<python>
+from Bio.PDB import PDBParser
+
+p = PDBParser()
+s = p.get_structure('example', '1IHM.pdb')
+
+print list(s.get_residues())[0]
+<Residue ASP het=  resseq=1029 icode= >
+
+s.renumber_residues()
+print list(s.get_residues())[0]
+<Residue ASP het=  resseq=1 icode= >
+</python>
+
+   
+====  Probe disulphide bridges in the structure ====
+
+The same rationale from SEQRES applies for the exclusion of looking up SSBOND. Also, instead of using NeighborSearch to look for pairs of cysteins in bond distance, I instead used the minus operator since it has been overloaded to return the distance between two atoms (Page 10 of the [http://www.biopython.org/DIST/docs/cookbook/biopdb_faq.pdf FAQ]). The average distance cited in the literature is 2.05A but other software packages and my own tests set 3.0A as a good threshold. Still, the user can set his own threshold manually.
+
+The function returns an iterator with tuples of pairs of residues.
+
+<python>
+from Bio.PDB import PDBParser
+
+p = PDBParser()
+s = p.get_structure('example', '4PTI.pdb')
+
+prot = s.as_protein()
+
+for bond in prot.search_ss_bonds():
+  print bond
+
+(<Residue CYS het=  resseq=5 icode= >, <Residue CYS het=  resseq=55 icode= >)
+(<Residue CYS het=  resseq=14 icode= >, <Residue CYS het=  resseq=38 icode= >)
+(<Residue CYS het=  resseq=30 icode= >, <Residue CYS het=  resseq=51 icode= >)
+</python>
+
+   
+====  Extract Biological Unit ====
+
+Added parsing for REMARK350 to parse_pdb_header since there was already a bit written for another REMARK section. This extracts the transformation matrices and the translation vector from the header, that is then fed to the Structure function. Each new rotated structure is created as a new MODEL. I chose this because crystal structures very rarely have more than one MODEL instance and also because NMR models don't have REMARK 350 that often (at least to my knowledge).
+
+<python>
+from Bio.PDB import PDBParser
+
+p = PDBParser()
 
 
-====  Reviewing documentation, code, write tests for new functions. ====
+s1 = p.get_structure('a', '4PTI.pdb')
+s1.build_biological_unit()
+'Processed 0 transformations on the structure.' # Identity matrix is ignored.
 
+s2 = p.get_structure('b', 'homol_1bd8.pdb') # A homology model
+s2.build_biological_unit()
+'PDB File lacks appropriate REMARK 350 entries to build Biological Unit.'
+
+s3 = p.get_structure('c', '1IHM.pdb')
+s3.build_biological_unit()
+'Processed 59 transformations on the structure.'
+</python>
+
+
+=== Weeks 2-5 ===
+
+
+==== Hydrogenation of PDB files ====
+
+Following discussion between the mentors and me, we decided that maybe it was better to not only include a webserver for this purpose but also a local algorithm. This would not limit the user when there he/she lacks an internet connection.
+
+The interface for the WHATIF Protonation service has been implemented, although it should be regarded as **highly experimental** for now. Interfacing this server included writing a small parser for a PDBXML-like format, which is expected to have serious bugs in its initial versions. I ran some simple tests and it works. It doesn't support water molecules yet, nor any other molecules other than proteins. Such issues will be hopefully solved later on..
+
+For those brave enough to want to test it (and help me debug it), here's an example usage.
+
+<python>
+from Bio.Struct.WWW import WHATIF
+from Bio import Struct
+
+server = WHATIF.WHATIF() # Performs a sort of PING to the server. Gracefully exits if the servers are down.
+
+# Get the protein structure
+structure = Struct.read('4PTI.pdb')
+protein = structure.as_protein() # This excludes water molecules
+
+# Upload the structure to the WHATIF server
+# This should convert the structure from a Structure object to a string via tempfile and PDBIO
+# I was having some issues uploading structures...
+
+id = server.UploadPDB(protein)
+
+# Protonate
+# Returns a Structure Object / WARNING! Bug prone for now.
+
+protein_h = server.PDBasXMLwithSymwithPolarH(id)
+
+</python>
+
+
+Regarding the local implementation, after much reading I settled on using PyMol's algorithm. It seems to allow for protonation of any structure, regardless of its nature (protein, DNA, etc). Its vectorial and matrix operations can likely be optimized with Numpy and Biopython's Vector.py module.
+
+
+====  Coarse Grain Structure ====
+
+A Center of Mass function was developed first as part of a new module Bio.Struct.Geometry. It allows for calculation of the center of geometry (all masses are equal) and center of mass (taking into account elemental masses for the atoms). The masses are a new Atom object feature derived from [http://www.chem.qmul.ac.uk/iupac/AtWt/ this list] and from PyMol. Essentially, all atoms of a structure now get their mass defined when the Structure is created (check Atom.py and [http://lists.open-bio.org/pipermail/biopython-dev/2010-June/007880.html this thread] for details). This is obviously experimental.
+
+To calculate the center of mass of any Entity (Structure, Model, Chain, Residue) or a List of Atoms:
+
+<python>
+from Bio.Struct.Geometry import center_of_mass
+from Bio import Struct
+
+s = Struct.read('4PTI.pdb')
+
+print center_of_mass.__doc__
+
+    Returns gravitic or geometric center of mass of an Entity.
+    Geometric assumes all masses are equal (geometric=True)
+    Defaults to Gravitic.
+
+
+print center_of_mass(s)
+[14.833301303933874, 21.431581746366263, 4.1218478418007134]
+
+print center_of_mass(s, geometric=True)
+[14.805324902127458, 21.365571977563405, 4.1108949403803985]
+</python>
+
+Coarse-Graining makes use of this function when reducing each residue to 3 points (ENCAD-like): Ca, peptide-bond O, and center of mass of side chain. The default CG function reduces the protein to a Ca-trace. I am still working on implementing perhaps some other CG-representations such as that from CABS.
+
+An example, picking up the s Structure from above:
+
+<python>
+p = s.as_protein() # To expose the CG method
+
+ca_trace = p.coarse_grain()
+
+# One atom per residue
+print ( len(list(p.get_residues())) == len(list(ca_trace.get_atoms())) )
+True
+
+cg_3pt = p.coarse_grain('3pt')
+
+for residue in cg_3pt.get_residues():
+  print residue.resname, residue.child_list
+
+ARG [<Atom CA>, <Atom O>, <Atom CMA>]
+PRO [<Atom CA>, <Atom O>, <Atom CMA>]
+ASP [<Atom CA>, <Atom O>, <Atom CMA>]
+PHE [<Atom CA>, <Atom O>, <Atom CMA>]
+CYS [<Atom CA>, <Atom O>, <Atom CMA>]
+LEU [<Atom CA>, <Atom O>, <Atom CMA>]
+GLU [<Atom CA>, <Atom O>, <Atom CMA>]
+PRO [<Atom CA>, <Atom O>, <Atom CMA>]
+PRO [<Atom CA>, <Atom O>, <Atom CMA>]
+TYR [<Atom CA>, <Atom O>, <Atom CMA>]
+.....
+CYS [<Atom CA>, <Atom O>, <Atom CMA>]
+GLY [<Atom CA>, <Atom O>]
+GLY [<Atom CA>, <Atom O>]
+ALA [<Atom CA>, <Atom O>, <Atom CMA>]
+</python>
+
+==== Removal of disordered atoms ====
+
+Implement as part of Structure.py and based loosely on the [http://www.biopython.org/wiki/Remove_PDB_disordered_atoms contribution of Ramon Crehuet]. The DisorderedAtom objects are removed from the residue and a single Atom object is added corresponding to the location of the user's choice (keep_loc argument) which defaults to A.
+
+An example, still keeping s from above:
+
+<python>
+s = s.remove_disordered_atoms(verbose=True)
+0 residues were modified
+
+# Now if we load a structure with disordered atoms
+ds = Struct.read('1MC2.pdb')
+ds.remove_disordered_atoms(verbose=True)
+Residue TRP:1010 has 8 disordered atoms: CD1/CD2/NE1/CE2/CE3/CZ2/CZ3/CH2
+Residue VAL:1018 has 3 disordered atoms: CB/CG1/CG2
+Residue LEU:1024 has 4 disordered atoms: CB/CG/CD1/CD2
+Residue ARG:1043 has 7 disordered atoms: CB/CG/CD/NE/CZ/NH1/NH2
+Residue MET:1092 has 4 disordered atoms: CB/CG/SD/CE
+Residue ARG:1107 has 7 disordered atoms: CB/CG/CD/NE/CZ/NH1/NH2
+Residue GLU:1108 has 4 disordered atoms: CG/CD/OE1/OE2
+Residue ASP:1111 has 4 disordered atoms: CB/CG/OD1/OD2
+Residue SER:1116 has 1 disordered atoms: OG
+Residue SER:1131 has 1 disordered atoms: O
+10 residues were modified
+</python>
