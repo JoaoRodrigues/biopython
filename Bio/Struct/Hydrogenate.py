@@ -161,18 +161,16 @@ class Hydrogenate_Protein:
                                         altloc=' ', fullname=miss, serial_number=random.randint(5000,9999), element='H' )
                         residue.add(new_at)
                         
-                    # elif len(missing_atoms) == 2:
-                    #     coordinates = self._add_2(missing_atoms, residue.child_dict[atom], incomplete_atoms[atom][1])
-                    #     for name in coordinates:
-                    #         new_at = Atom(name=name, coord=coordinates[name], bfactor=1.0, occupancy=0.0, 
-                    #                         altloc=' ', fullname=name, serial_number=random.randint(5000,9999), element='H')
-                    #         # residue.add(new_at)
-                    #         print new_at.name,
-                    #         print new_at.coord
+                    elif len(missing_atoms) == 2:
+                        coordinates = self._add_2(missing_atoms, residue.child_dict[atom], incomplete_atoms[atom][1])
+                        for name in coordinates:
+                            new_at = Atom(name=name, coord=coordinates[name], bfactor=1.0, occupancy=0.0, 
+                                            altloc=' ', fullname=name, serial_number=random.randint(5000,9999), element='H')
+                            residue.add(new_at)
                             
     def _add_1(self, hydrogen_name, heavy_atom, bonds):
         """
-        Adds one proton to an atom.
+        Adds the missing proton to single protonated heavy_atoms.
         """
         
         residue = heavy_atom.parent
@@ -210,7 +208,7 @@ class Hydrogenate_Protein:
                     
             elif len(bonds):
                 d2 = [1.0,0,0]
-                p0 = heavy_atom.coord -bonds[0].coord
+                p0 = heavy_atom.coord - anchor.coord
                 p1 = normalize(cross_product(d2,p0))
                 v = scale(p1,TET_TAN)
                 v = normalize(add(p0,v))
@@ -248,106 +246,132 @@ class Hydrogenate_Protein:
         
         return hydrogen_coord
         
-    def _add_2(self, miss, atom, anchor, bonded):
+    def _add_2(self, hydrogens, heavy_atom, bonds):
         
-        coord = {} # Returns two coordinate sets
+        hydrogen_coord = {} # Returns two coordinate sets [Atom]: [x, y, z]
         
-        residue = atom.parent
-        sel = self.selection[residue]
-        at1 = atom
-        at2 = miss[0]
-        know = bonded
+        residue = heavy_atom.parent
+        ffld = self.ffld[self.selection[residue]]
         bnd_len = self.bondfield.length
-
-        if self.bondfield.planer.has_key(self.ffld[sel][(residue.resname, at1.name)]['type']): # guanido, etc
-            near = self._find_secondary_anchors(residue, at1, anchor)
-            if near: # 1-4 present
-                print "Planar Near"
-                at3 = anchor
-                at4 = near
-                d1 = sub(at1.coord,at3.coord)
-                p0 = normalize(d1)
-                d2 = sub(at4.coord,at3.coord)
-                p1 = normalize(cross_product(d2,p0))
-                p2 = normalize(cross_product(p0,p1))
-                v = scale(p2,TRI_TAN)
-                v = normalize(add(p0,v))
-                coord[at2] = add(at1.coord,scale(v,
-                  bnd_len[(self.ffld[sel][(residue.resname, at1.name)]['type'],self.ffld[sel][(residue.resname, at2)]['type'])]))                                                         
-                at2 = miss[1]
-                v = scale(p2,-TRI_TAN)
-                v = normalize(add(p0,v))
-                coord[at2] = add(at1.coord,scale(v,
-                  bnd_len[(self.ffld[sel][(residue.resname, at1.name)]['type'],self.ffld[sel][(residue.resname, at2)]['type'])]))
-            
-            elif len(know): # no 1-4 found
-                print "Planar not/near"
-                d2 = [1.0,0,0]
-                at3 = anchor
-                d1 = sub(at1.coord,at3.coord)
-                p0 = normalize(d1)                  
-                p1 = normalize(cross_product(d2,p0))
-                p2 = normalize(cross_product(p0,p1))
-                v = scale(p2,TRI_TAN)
-                v = normalize(add(p0,v))
-                coord[at2] = add(at1.coord,scale(v,
-                  bnd_len[(self.ffld[sel][(residue.resname, at1.name)]['type'],self.ffld[sel][(residue.resname, at2)]['type'])]))
-                at2 = miss[1]
-                v = scale(p2,-TRI_TAN)
-                v = normalize(add(p0,v))
-                coord[at2] = add(at1.coord,scale(v,
-                  bnd_len[(self.ffld[sel][(residue.resname, at1.name)]['type'],self.ffld[sel][(residue.resname, at2)]['type'])]))
-            else:
-                coord = random_sphere(at1.coord,
-                    bnd_len[(self.ffld[sel][(residue.resname, at1.name)]['type'],self.ffld[sel][(residue.resname, at2)]['type'])])
+        anchor = bonds[0]
+        first_hydrogen, second_hydrogen = hydrogens
         
-        elif len(know)>=2: # simple tetrahedral
+        if self.bondfield.planer.has_key(ffld[(residue.resname, heavy_atom.name)]['type']): # guanido, etc
+            bonded = self._find_secondary_anchors(residue, heavy_atom, bonds[0])
+            if bonded: # 1-4 present
+                secondary_anchor = bonded[0]
+                
+                # Add first H
+                
+                d1 = heavy_atom.coord - anchor.coord
+                d2 = secondary_anchor.coord - anchor.coord
+                p1 = normalize(cross_product(d2,d1))
+                p2 = normalize(cross_product(d1,p1))
+                v = scale(p2,TRI_TAN)
+                v = normalize(add(d1,v))
+                hydrogen_coord[first_hydrogen] = add(heavy_atom.coord,
+                                            scale(v,
+                                                  bnd_len[(ffld[(residue.resname, heavy_atom.name)]['type'],
+                                                           ffld[(residue.resname, first_hydrogen)]['type'])]))                                                         
+                # Add second H
+
+                v = scale(p2,-TRI_TAN)
+                v = normalize(add(d1,v))
+                hydrogen_coord[second_hydrogen] = add(heavy_atom.coord,
+                                                      scale(v,
+                                                            bnd_len[(ffld[(residue.resname, heavy_atom.name)]['type'],
+                                                                     ffld[(residue.resname, second_hydrogen)]['type'])]))
+            
+            elif len(bonds): # no 1-4 found
+
+                # H1
+
+                d2 = [1.0,0,0]
+                d1 = heavy_atom.coord - anchor.coord
+                p1 = normalize(cross_product(d2,d1))
+                p2 = normalize(cross_product(d1,p1))                
+                v = scale(p2,TRI_TAN)
+                v = normalize(add(d1,v))
+                
+                hydrogen_coord[first_hydrogen] = add(heavy_atom.coord,
+                                                      scale(v,
+                                                            bnd_len[(ffld[(residue.resname, heavy_atom.name)]['type'],
+                                                                     ffld[(residue.resname, first_hydrogen)]['type'])]))
+                
+                # H2
+
+                v = scale(p2,-TRI_TAN)
+                v = normalize(add(d1,v))
+                hydrogen_coord[second_hydrogen] = add(heavy_atom.coord,
+                                                      scale(v,
+                                                            bnd_len[(ffld[(residue.resname, heavy_atom.name)]['type'],
+                                                                     ffld[(residue.resname, second_hydrogen)]['type'])]))
+            else: # If all else fails, add one random
+                hydrogen_coord[first_hydrogen] = random_sphere(heavy_atom.coord,
+                                                                bnd_len[(ffld[(residue.resname, heavy_atom.name)]['type'],
+                                                                         ffld[(residue.resname, first_hydrogen)]['type'])])
+        
+        elif len(bonds)>=2: # simple tetrahedral
             print "Simple T"
-            at3 = anchor
-            at4 = bonded[1]
+            
+            secondary_anchor = bonds[1]
+            
+            # H1
             v = [0.0,0.0,0.0]
-            d1 = sub(at1.coord,at3.coord)
-            d2 = sub(at1.coord,at4.coord)
-            v = add(normalize(d1),normalize(d2))
+            d1 = heavy_atom.coord - anchor.coord
+            d2 = heavy_atom.coord - secondary_anchor.coord
+            v = add(d1,d2)
             p0 = normalize(v)
             p1 = normalize(cross_product(d2,p0))
             v = scale(p1,TET_TAN)
             v = normalize(add(p0,v))
-            coord[at2] = add(at1.coord,scale(v,
-                    bnd_len[(self.ffld[sel][(residue.resname, at1.name)]['type'],self.ffld[sel][(residue.resname, at2)]['type'])]))
-            at2 = miss[1]               
+            
+            hydrogen_coord[first_hydrogen] = add(heavy_atom.coord,
+                                                  scale(v,
+                                                        bnd_len[(ffld[(residue.resname, heavy_atom.name)]['type'],
+                                                                 ffld[(residue.resname, first_hydrogen)]['type'])]))
+            # H2
+               
             v = scale(p1,-TET_TAN)
             v = normalize(add(p0,v))
-            coord[at2] = add(at1.coord,scale(v,
-                    bnd_len[(self.ffld[sel][(residue.resname, at1.name)]['type'],self.ffld[sel][(residue.resname, at2)]['type'])]))
+            hydrogen_coord[second_hydrogen] = add(heavy_atom.coord,
+                                                  scale(v,
+                                                        bnd_len[(ffld[(residue.resname, heavy_atom.name)]['type'],
+                                                                 ffld[(residue.resname, second_hydrogen)]['type'])]))
         else:
-            if len(know): # sulfonamide? 
+            # H1
+            if len(bonds): # sulfonamide? 
                 print "Sulfonamide"
+                
                 d2 = [1.0,0,0]
-                at3 = anchor
-                d1 = sub(at1.coord,at3.coord)
-                p0 = normalize(d1)                                    
-                p1 = normalize(cross_product(d2,p0))
+                d1 = heavy_atom.coord - anchor.coord              
+                p1 = normalize(cross_product(d2,d1))
                 v = scale(p1,TET_TAN)
                 v = normalize(add(p0,v))
-                coord[at2] = add(at1.coord,scale(v,
-                    bnd_len[(self.ffld[sel][(residue.resname, at1.name)]['type'],self.ffld[sel][(residue.resname, at2)]['type'])]))
+                hydrogen_coord[first_hydrogen] = add(heavy_atom.coord,
+                                                      scale(v,
+                                                            bnd_len[(ffld[(residue.resname, heavy_atom.name)]['type'],
+                                                                     ffld[(residue.resname, first_hydrogen)]['type'])]))
             else: # blind
-                coord[at2] = random_sphere(at1.coord,
-                    bnd_len[(self.ffld[sel][(residue.resname, at1.name)]['type'],self.ffld[sel][(residue.resname, at2)]['type'])])
-            at4=at2
-            at2=miss[1]
+                hydrogen_coord[first_hydrogen] = random_sphere(heavy_atom.coord,
+                                                                bnd_len[(ffld[(residue.resname, heavy_atom.name)]['type'],
+                                                                         ffld[(residue.resname, first_hydrogen)]['type'])])
+            # H2
+            first_hydrogen_coord = hydrogen_coord[first_hydrogen]
+
             v = [0.0,0.0,0.0]
-            d1 = sub(at1.coord,at3.coord)
-            d2 = sub(at1.coord,at4.coord)
+            d1 = heavy_atom.coord - anchor.coord
+            d2 = sub(heavy_atom.coord, first_hydrogen_coord)
             v = add(normalize(d1),normalize(d2))
             p0 = normalize(v)
             p1 = normalize(cross_product(d2,p0))
             v = scale(p1,TET_TAN)
             v = normalize(add(p0,v))
-            coord[at2] = add(at1.coord,scale(v,
-                bnd_len[(self.ffld[sel][(residue.resname, at1.name)]['type'],self.ffld[sel][(residue.resname, at2)]['type'])]))
-        return coord
+            hydrogen_coord[second_hydrogen] = add(heavy_atom.coord,
+                                                  scale(v,
+                                                        bnd_len[(ffld[(residue.resname, heavy_atom.name)]['type'],
+                                                                 ffld[(residue.resname, second_hydrogen)]['type'])]))
+        return hydrogen_coord
         
     def _add_3(self):
         pass
