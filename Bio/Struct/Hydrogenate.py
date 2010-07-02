@@ -1,15 +1,14 @@
 # Copyright (C) 2010, Joao Rodrigues (anaryin@gmail.com)
-# This module is heavily based on PyMol's code and also in MMTK's code.
+# This module is heavily based on PyMol's code.
 # Similarities are not a coincidence.
 # PyMol: chempy/protein.py chempy/place.py
-# MMTK: Proteins.py / ChemicalObjects.py
 # This code is part of the Biopython distribution and governed by its
 # license.  Please see the LICENSE file that should have been included
 # as part of this package.
 
 # Vector Operations
 
-import numpy as N
+from cpv import *
 
 # BioPython modules
 from Bio.PDB.Entity import Entity
@@ -20,23 +19,26 @@ import protein_residues
 import protein_amber
 import bond_amber
 
+TET_TAN = 1.41
+TRI_TAN = 1.732
+
 class Hydrogenate_Protein:
 
-    def __init__(self, u_input):
+    def __init__(self, u_input, forcefield=protein_amber, template=protein_residues):
         
         # Load Structure & Perform routines
         self.nh_structure = u_input
-        self.exclude_ss_bonded_cysteines()
+        self._exclude_ss_bonded_cysteines()
         
         # FF and Tmplt pre-load
         
-        self.tmpl = {   'cter': protein_residues.c_terminal,
-                        'nter': protein_residues.n_terminal,
-                        'nrml': protein_residues.normal
+        self.tmpl = {   'cter': template.c_terminal,
+                        'nter': template.n_terminal,
+                        'nrml': template.normal
                     }
-        self.ffld = {   'cter': protein_amber.c_terminal,
-                        'nter': protein_amber.n_terminal,
-                        'nrml': protein_amber.normal
+        self.ffld = {   'cter': forcefield.c_terminal,
+                        'nter': forcefield.n_terminal,
+                        'nrml': forcefield.normal
                     }
 
         # Constants (Taken from PyMol)
@@ -44,188 +46,310 @@ class Hydrogenate_Protein:
                                   '1H','2H','3H','1HT','2HT','3HT'])
 
         self.C_TERMINAL_ATOMS = set(['OXT','O2','OT1','OT2'])
-
-        # Geometries adapted from MMTK (add Length and Angles)
-        self.geometries =   {   'C':    {   3: 'Tetrahedral',
-                                            2: 'Trigonal Planar',
-                                            1: 'Linear'
-                                        },
-                                'N':    {   3: 'Tetrahedral',
-                                            2: 'Trigonal Planar',
-                                            1: 'Linear'
-                                        },
-                                'O':    {   1: 'Linear'},
-                                'S':    {   1: 'Linear'},
-                            }
         
+        # Protonation Methods
+        
+        self.protonation_methods = {
+                                    1: self._add_1,
+                                    2: self._add_2,
+                                    3: self._add_3,
+                                    4: self._add_4
+                                    }
     
-    def exclude_ss_bonded_cysteines(self):
-        
-        # Pre-compute ss bonds to discard cysteines later
-        ss_bonds =  self.nh_structure.search_ss_bonds()
-        self.ss_cysteines = []
-        for cys_pair in ss_bonds:
-            self.ss_cysteines += list(cys_pair)
-        
-        return self.ss_cysteines
-        
-    def find_missing_hydrogens(self):
+    def _build_bonding_network(self):
         """
-        Takes as input an Entity-based class (S,M,C,R) or a list of Residues.
-        Iterates over the object to find missing atoms in protein residues.
-        Uses protein_amber.py, bond_amber.py, and protein_residues.py to find those missing.
-        Adds them to the structure with coordinates x=y=z=666 and serial number 0.
+        Evaluates atoms per residue for missing and known bonded partners.
+        Based on bond_amber.
+        A better alternative would be to iterate over the entire list of residues and 
+        use NeighborSearch to probe neighbors for atom X in residue i, i-1 and i+1
         """
-
-        if isinstance(self.nh_structure, Entity): # Structure, Model, Chain, Residues
-            if self.nh_structure.level in ['S', 'M', 'C']:
-                residue_list = list(self.nh_structure.get_residues())
-            else:
-                residue_list = [self.nh_structure]
-        elif hasattr(self.nh_structure, '__iter__'): # List of Residues?
-            if not [i for i in self.nh_structure if not i.level == 'R']: # Every single object is a residue
-                residue_list = self.nh_structure
-        else: # Some other weirdo object
-            raise ValueError('Can only search for missing atoms in Entity-based classes (S,M,C,R).')
-
+        
+        self.bonds = {} # [Residue][Atom]: [ [missing], [bonded] ]
+        self.selection = {} # [Residue]: 'nrml'/'nter'/'cter'
+        
+        for residue in self.nh_structure.get_residues():
             
-        self.missing_per_residue = {}
-
-        for residue in residue_list:
+            bond_dict = self.bonds[residue] = {}
             
-            self.missing_per_residue[residue] = {}
+            atom_dict = residue.child_dict
+            atom_names = set(atom_dict.keys())
             
-            if residue in self.ss_cysteines:
-                exclude_sh = True
-            else:
-                exclude_sh = False
+            # Pre-Populate Dictionary
             
-            atom_list = residue.child_dict
-            names = set(atom_list.keys())
-
-            # Set Template & Force Field
-            if names.intersection(self.C_TERMINAL_ATOMS):
+            for name in atom_names:
+                bond_dict[name] = [ [], [] ]
+            
+            # Define Template
+            if atom_names.intersection(self.C_TERMINAL_ATOMS):
                 selection = 'cter'
-            elif names.intersection(self.N_TERMINAL_ATOMS):
+            elif atom_names.intersection(self.N_TERMINAL_ATOMS):
                 selection = 'nter'
             else:
                 selection = 'nrml'
-
-            # Define stuff
+            
             tmpl = self.tmpl[selection]
-            ffld = self.ffld[selection]
-
-            # Go!
+            self.selection[residue] = selection # For place_hs
+            
+            # Iterate Template Bonds and record info
+            
             if not tmpl.has_key(residue.resname):
                 raise ValueError("Unknown Residue Type: %s" %residue.resname)
-            else:
-                bonds = tmpl[residue.resname]['bonds']
-
-                for pair in bonds.keys(): # Returns tuples of bonded atoms e.g. (N, CA)
-                    a, b = pair
-                    if a in names and b not in names: # b is missing
-                        if a == 'SG' and exclude_sh:
-                            continue
-                        if not ( b[0] == 'H' or ( b[1] == 'H' and b[0].isdigit()) ): # Hx and dHx
-                            continue
-                        
-                        # Update missing
-                        if self.missing_per_residue[residue].has_key(atom_list[a]):
-                            self.missing_per_residue[residue][atom_list[a]].append(b)
-                        else:
-                            self.missing_per_residue[residue][atom_list[a]] = [b]
-                        
-                    elif b in names and a not in names: # a is missing
-                        if b == 'SG' and exclude_sh:
-                            continue
-                        if not ( a[0] == 'H' or ( a[1] == 'H' and a[0].isdigit()) ): # Hx and dHx
-                            continue
-
-                        if self.missing_per_residue[residue].has_key(atom_list[b]):
-                            self.missing_per_residue[residue][atom_list[b]].append(a)
-                        else:
-                            self.missing_per_residue[residue][atom_list[b]] = [a]
-                         
-                    else: # Both exist
-                        pass
-
-        return 
             
-    def find_anchor(self, atom, tmpl):
-        """
-        Given a heavy atom, finds another heavy atom it is connected to.
-        Necessary for H positioning.
-        Returns Atom object.
-        """
-        residue = atom.parent
-        bonds = tmpl[residue.resname]['bonds']
-        
-        for pair in bonds:
-            a,b = pair
-            if ( a[0] == 'H' or ( a[0].isdigit() and a[1] == 'H') ) or ( b[0] == 'H' or ( b[0].isdigit() and b[1] == 'H') ):
-                pass # Ignore Hs
-            elif a == atom.name:
-                anchor = [i for i in residue.child_list if i.name == b][0]
-                return anchor
-            elif b == atom.name:
-                anchor = [i for i in residue.child_list if i.name == a][0]
-                return anchor
-        
-        return 0   
+            template_bonds = tmpl[residue.resname]['bonds']
+            
+            for bond in template_bonds.keys():
                 
+                a1, a2 = bond
+                
+                if a1 in atom_names and not a2 in atom_names:
+                    bond_dict[a1][0].append(a2)
+                elif a1 not in atom_names and a2 in atom_names:
+                    bond_dict[a2][0].append(a1)
+                else: # 
+                    bond_dict[a1][1].append(atom_dict[a2])
+                    bond_dict[a2][1].append(atom_dict[a1])   
+    
+    def _exclude_ss_bonded_cysteines(self):
         
-    def build_hydrogens(self, bond_field=bond_amber):
+        # Pre-compute ss bonds to discard cystines for H-adding.
+        ss_bonds =  self.nh_structure.search_ss_bonds()
+        for cys_pair in ss_bonds:
+            cys1, cys2 = cys_pair
+            
+            cys1.resname = 'CYX'
+            cys2.resname = 'CYX'
+    
+    def _find_secondary_anchors(self, residue, heavy_atom, anchor):
         """
-        Places missing hydrogens atoms based on simple geometric criteria.
+        Searches through the bond network for atoms bound to the anchor.
+        Returns a secondary and tertiary anchors.
+        Example, for CA, returns C and O.
         """
-             
-        for residue in self.missing_per_residue:
+        
+        for secondary in self.bonds[residue][anchor.name][1]:
+            for tertiary in self.bonds[residue][secondary.name][1]:
+                if tertiary.name != heavy_atom.name and tertiary.name != anchor.name:
+                    return (secondary,tertiary)
+        
+        return None
+        
+    def place_hydrogens(self, bondfield=bond_amber):
+        
+        # define bondfield
+        self.bondfield = bondfield
+        
+        last_count = -1
+        
+        # Determine how many Hs each HA needs
+        
+        for residue in sorted(self.bonds.keys(), key=lambda x: x.get_id()[1]):
+            incomplete_atoms = self.bonds[residue]
+            print
+            print residue.resname
+            for atom in incomplete_atoms:
+                missing_atoms = incomplete_atoms[atom][0]
+                if len(missing_atoms):                
+                
+                    #near = self._find_secondary_anchors(residue, atom, anchor)
+                    #print near.name
+                    #h_add = self.protonation_methods[len(missing_atoms)]
+                    miss = missing_atoms[0]
+                    print atom
+                    if len(missing_atoms) == 1:
+                        h_coord = self._add_1(miss, residue.child_dict[atom], incomplete_atoms[atom][1])
+                        new_at = Atom(name=miss, coord=h_coord, bfactor=1.0, occupancy=0.0, 
+                                        altloc=' ', fullname=miss, serial_number=random.randint(5000,9999), element='H' )
+                        residue.add(new_at)
                         
-            print "Building hydrogens on residue:", residue.resname
-            
-            need = [ [], [], [], [] ]
-            
-            
+                    # elif len(missing_atoms) == 2:
+                    #     coordinates = self._add_2(missing_atoms, residue.child_dict[atom], incomplete_atoms[atom][1])
+                    #     for name in coordinates:
+                    #         new_at = Atom(name=name, coord=coordinates[name], bfactor=1.0, occupancy=0.0, 
+                    #                         altloc=' ', fullname=name, serial_number=random.randint(5000,9999), element='H')
+                    #         # residue.add(new_at)
+                    #         print new_at.name,
+                    #         print new_at.coord
+                            
+    def _add_1(self, hydrogen_name, heavy_atom, bonds):
+        """
+        Adds one proton to an atom.
+        """
+        
+        residue = heavy_atom.parent
+        ffld = self.ffld[self.selection[residue]]
+        bnd_len = self.bondfield.length
+        anchor = bonds[0]
+                
+        # If not linear
+        if self.bondfield.nonlinear.has_key(ffld[(residue.resname, heavy_atom.name)]['type']):
+            bonded = self._find_secondary_anchors(residue, heavy_atom, anchor) # Tuple of two atoms
 
-            
-            
-            
-            
-            
-            
-            
-            
-            # # Iterate..
-            # for heavy_atom in ha_list:
-            #     
-            #     h_atoms = ha_list[heavy_atom]
-            #     
-            #     nH = len(h_atoms) # Number of Hs to add
-            #     element = heavy_atom.element # Element of Core Atom (C,N,S,O)
-            #     
-            #     if not self.geometries.has_key(element):
-            #         try:
-            #             element = ffld[(residue.resname, heavy_atom.name)]['type'][0] # Try to recover element from ffld
-            #         except KeyError:
-            #             raise ValueError('Residue or Atom not recognized: (%s, %s)' %(residue.resname, heavy_atom.name))
-            #     
-            #     geometry = self.geometries[element][nH] # Tetrahedral, etc...
-            # 
-            #         
-            #     anchor =  self.find_anchor(heavy_atom, tmpl) # Second heavy atom
-            # 
-            #     print "Heavy Atom: %s / Element is %s / Geometry is %s / Anchor is %s" %(heavy_atom, element, geometry, anchor)
-            #     print nH
-            #     try:
-            #         new_atom = geometry(heavy_atom, anchor, None)
-            #         yield new_atom
-            #     except:
-            #         print 'No can do'
-            #     
-            #     # 
+            if bonded:
+                if self.bondfield.planer.has_key(ffld[(residue.resname, anchor.name)]['type']): # Phenolic hydrogens, etc.
+                    secondary_anchor = bonded[0]
+                   
+                    p0 = heavy_atom.coord - anchor.coord
+                    d2 = secondary_anchor.coord - anchor.coord
+                    p1 = normalize(cross_product(d2,p0))
+                    p2 = normalize(cross_product(p0,p1))                     
+                    v = scale(p2,TRI_TAN)
+                    v = normalize(add(p0,v))
                     
+                    hydrogen_coord = add(heavy_atom.coord,
+                                        scale(v, 
+                                              bnd_len[(ffld[(residue.resname, heavy_atom.name)]['type'], 
+                                              ffld[(residue.resname, hydrogen_name)]['type'])]    ))
                 
+                else: # Ser, Cys, Thr hydroxyl hydrogens
+                    secondary_anchor = bonded[0]
+                    v = anchor.coord - secondary_anchor.coord
+                    hydrogen_coord = add(heavy_atom.coord,
+                                        scale(v, 
+                                              bnd_len[(ffld[(residue.resname, heavy_atom.name)]['type'], 
+                                              ffld[(residue.resname, hydrogen_name)]['type'])]    ))
+                    
+            elif len(bonds):
+                d2 = [1.0,0,0]
+                p0 = heavy_atom.coord -bonds[0].coord
+                p1 = normalize(cross_product(d2,p0))
+                v = scale(p1,TET_TAN)
+                v = normalize(add(p0,v))
                 
-                
+                hydrogen_coord = add(heavy_atom.coord,
+                                     scale(  v, 
+                                             bnd_len[(ffld[(residue.resname, heavy_atom.name)]['type'], 
+                                             ffld[(residue.resname, hydrogen_name)]['type'])]    ))
+            else:
+                hydrogen_coord = random_sphere(heavy_atom.coord,
+                                               bnd_len[ (ffld[(residue.resname, heavy_atom.name)]['type'],
+                                                         ffld[(residue.resname, hydrogen_name)]['type']) ])
+
+        elif len(bonds): # linear sum...amide, tbu, etc
+            v = [0.0,0.0,0.0]
+            if heavy_atom.name == 'N': # Fix to get previous atom O from peptide bond. Ugly.
+                prev_res = list(residue.get_id())
+                prev_res[1] -= 1
+                prev_res = tuple(prev_res)
+                if residue.parent.child_dict.has_key(prev_res):
+                    prev_res = residue.parent.child_dict[prev_res]
+                    bonds.append(prev_res.child_dict['O'])
+            for b in bonds:
+                d = heavy_atom.coord - b.coord
+                v = add(v, d)
+            v = normalize(v)
+            hydrogen_coord = add(heavy_atom.coord,
+                                 scale(v,
+                                 bnd_len[(ffld[(residue.resname, heavy_atom.name)]['type'],
+                                          ffld[(residue.resname, hydrogen_name)]['type']) ]))
+        else:
+            hydrogen_coord = random_sphere(heavy_atom.coord,
+                                           bnd_len[ (ffld[(residue.resname, heavy_atom.name)]['type'],
+                                                     ffld[(residue.resname, hydrogen_name)]['type']) ])
         
+        return hydrogen_coord
         
+    def _add_2(self, miss, atom, anchor, bonded):
+        
+        coord = {} # Returns two coordinate sets
+        
+        residue = atom.parent
+        sel = self.selection[residue]
+        at1 = atom
+        at2 = miss[0]
+        know = bonded
+        bnd_len = self.bondfield.length
+
+        if self.bondfield.planer.has_key(self.ffld[sel][(residue.resname, at1.name)]['type']): # guanido, etc
+            near = self._find_secondary_anchors(residue, at1, anchor)
+            if near: # 1-4 present
+                print "Planar Near"
+                at3 = anchor
+                at4 = near
+                d1 = sub(at1.coord,at3.coord)
+                p0 = normalize(d1)
+                d2 = sub(at4.coord,at3.coord)
+                p1 = normalize(cross_product(d2,p0))
+                p2 = normalize(cross_product(p0,p1))
+                v = scale(p2,TRI_TAN)
+                v = normalize(add(p0,v))
+                coord[at2] = add(at1.coord,scale(v,
+                  bnd_len[(self.ffld[sel][(residue.resname, at1.name)]['type'],self.ffld[sel][(residue.resname, at2)]['type'])]))                                                         
+                at2 = miss[1]
+                v = scale(p2,-TRI_TAN)
+                v = normalize(add(p0,v))
+                coord[at2] = add(at1.coord,scale(v,
+                  bnd_len[(self.ffld[sel][(residue.resname, at1.name)]['type'],self.ffld[sel][(residue.resname, at2)]['type'])]))
+            
+            elif len(know): # no 1-4 found
+                print "Planar not/near"
+                d2 = [1.0,0,0]
+                at3 = anchor
+                d1 = sub(at1.coord,at3.coord)
+                p0 = normalize(d1)                  
+                p1 = normalize(cross_product(d2,p0))
+                p2 = normalize(cross_product(p0,p1))
+                v = scale(p2,TRI_TAN)
+                v = normalize(add(p0,v))
+                coord[at2] = add(at1.coord,scale(v,
+                  bnd_len[(self.ffld[sel][(residue.resname, at1.name)]['type'],self.ffld[sel][(residue.resname, at2)]['type'])]))
+                at2 = miss[1]
+                v = scale(p2,-TRI_TAN)
+                v = normalize(add(p0,v))
+                coord[at2] = add(at1.coord,scale(v,
+                  bnd_len[(self.ffld[sel][(residue.resname, at1.name)]['type'],self.ffld[sel][(residue.resname, at2)]['type'])]))
+            else:
+                coord = random_sphere(at1.coord,
+                    bnd_len[(self.ffld[sel][(residue.resname, at1.name)]['type'],self.ffld[sel][(residue.resname, at2)]['type'])])
+        
+        elif len(know)>=2: # simple tetrahedral
+            print "Simple T"
+            at3 = anchor
+            at4 = bonded[1]
+            v = [0.0,0.0,0.0]
+            d1 = sub(at1.coord,at3.coord)
+            d2 = sub(at1.coord,at4.coord)
+            v = add(normalize(d1),normalize(d2))
+            p0 = normalize(v)
+            p1 = normalize(cross_product(d2,p0))
+            v = scale(p1,TET_TAN)
+            v = normalize(add(p0,v))
+            coord[at2] = add(at1.coord,scale(v,
+                    bnd_len[(self.ffld[sel][(residue.resname, at1.name)]['type'],self.ffld[sel][(residue.resname, at2)]['type'])]))
+            at2 = miss[1]               
+            v = scale(p1,-TET_TAN)
+            v = normalize(add(p0,v))
+            coord[at2] = add(at1.coord,scale(v,
+                    bnd_len[(self.ffld[sel][(residue.resname, at1.name)]['type'],self.ffld[sel][(residue.resname, at2)]['type'])]))
+        else:
+            if len(know): # sulfonamide? 
+                print "Sulfonamide"
+                d2 = [1.0,0,0]
+                at3 = anchor
+                d1 = sub(at1.coord,at3.coord)
+                p0 = normalize(d1)                                    
+                p1 = normalize(cross_product(d2,p0))
+                v = scale(p1,TET_TAN)
+                v = normalize(add(p0,v))
+                coord[at2] = add(at1.coord,scale(v,
+                    bnd_len[(self.ffld[sel][(residue.resname, at1.name)]['type'],self.ffld[sel][(residue.resname, at2)]['type'])]))
+            else: # blind
+                coord[at2] = random_sphere(at1.coord,
+                    bnd_len[(self.ffld[sel][(residue.resname, at1.name)]['type'],self.ffld[sel][(residue.resname, at2)]['type'])])
+            at4=at2
+            at2=miss[1]
+            v = [0.0,0.0,0.0]
+            d1 = sub(at1.coord,at3.coord)
+            d2 = sub(at1.coord,at4.coord)
+            v = add(normalize(d1),normalize(d2))
+            p0 = normalize(v)
+            p1 = normalize(cross_product(d2,p0))
+            v = scale(p1,TET_TAN)
+            v = normalize(add(p0,v))
+            coord[at2] = add(at1.coord,scale(v,
+                bnd_len[(self.ffld[sel][(residue.resname, at1.name)]['type'],self.ffld[sel][(residue.resname, at2)]['type'])]))
+        return coord
+        
+    def _add_3(self):
+        pass
+    def _add_4(self):
+        pass
