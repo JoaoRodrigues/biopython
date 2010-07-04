@@ -1,6 +1,6 @@
 # Copyright (C) 2010, Joao Rodrigues (anaryin@gmail.com)
 # This module is heavily based on PyMol's code.
-# Similarities are not a coincidence.
+# !! Similarities are not a coincidence. !!
 # PyMol: chempy/protein.py chempy/place.py
 # This code is part of the Biopython distribution and governed by its
 # license.  Please see the LICENSE file that should have been included
