@@ -1,3 +1,11 @@
+# Copyright 2000-2003 Jeff Chang.
+# Copyright 2001-2008 Brad Chapman.
+# Copyright 2005-2010 by Peter Cock.
+# Copyright 2006-2009 Michiel de Hoon.
+# All rights reserved.
+# This code is part of the Biopython distribution and governed by its
+# license.  Please see the LICENSE file that should have been included
+# as part of this package.
 """Represent a Sequence Feature holding info about a part of a sequence.
 
 This is heavily modeled after the Biocorba SeqFeature objects, and
@@ -67,9 +75,10 @@ class SeqFeature(object):
 
     CDS    join(1..10,30..40,50..60)
 
-    The the top level feature would be a CDS from 1 to 60, and the sub
-    features would be of 'CDS_join' type and would be from 1 to 10, 30 to
-    40 and 50 to 60, respectively.
+    Then the top level feature would be of type 'CDS' from 1 to 60 (actually 0
+    to 60 in Python counting) with location_operator='join', and the three sub-
+    features would also be of type 'CDS', and would be from 1 to 10, 30 to
+    40 and 50 to 60, respectively (although actually using Python counting).
 
     To get the nucleotide sequence for this CDS, you would need to take the
     parent sequence and do seq[0:10]+seq[29:40]+seq[49:60] (Python counting).
@@ -84,7 +93,7 @@ class SeqFeature(object):
         """Initialize a SeqFeature on a Sequence.
 
         location can either be a FeatureLocation (with strand argument also
-        given if required), or a Python slice (with strand given as the step).
+        given if required), or None.
 
         e.g. With no strand, on the forward strand, and on the reverse strand:
 
@@ -107,7 +116,7 @@ class SeqFeature(object):
         if strand not in [-1, 0, 1, None] :
             raise ValueError("Strand should be +1, -1, 0 or None, not %s" \
                              % repr(strand))
-        if location and not isinstance(location, FeatureLocation):
+        if location is not None and not isinstance(location, FeatureLocation):
             raise TypeError("FeatureLocation (or None) required for the location")
         self.location = location
 
@@ -147,7 +156,10 @@ class SeqFeature(object):
         """
         out = "type: %s\n" % self.type
         out += "location: %s\n" % self.location
-        out += "ref: %s:%s\n" % (self.ref, self.ref_db)
+        if self.id and self.id != "<unknown id>":
+            out += "id: %s\n" % self.id
+        if self.ref or self.ref_db:
+            out += "ref: %s:%s\n" % (self.ref, self.ref_db)
         out += "strand: %s\n" % self.strand
         out += "qualifiers: \n"
         qualifier_keys = self.qualifiers.keys()
@@ -166,19 +178,15 @@ class SeqFeature(object):
         """Returns a copy of the feature with its location shifted (PRIVATE).
 
         The annotation qaulifiers are copied."""
-        answer = SeqFeature(location = self.location._shift(offset),
-                   type = self.type,
-                   location_operator = self.location_operator,
-                   strand = self.strand,
-                   id = self.id,
-                   #qualifiers = dict(self.qualifiers.iteritems()),
-                   #sub_features = [f._shift(offset) for f in self.sub_features],
-                   ref = self.ref,
-                   ref_db = self.ref_db)
-        #TODO - Sort out the use of sub_feature and qualifiers in __init___
-        answer.sub_features = [f._shift(offset) for f in self.sub_features]
-        answer.qualifiers = dict(self.qualifiers.iteritems())
-        return answer
+        return SeqFeature(location = self.location._shift(offset),
+                type = self.type,
+                location_operator = self.location_operator,
+                strand = self.strand,
+                id = self.id,
+                qualifiers = dict(self.qualifiers.iteritems()),
+                sub_features = [f._shift(offset) for f in self.sub_features],
+                ref = self.ref,
+                ref_db = self.ref_db)
 
     def extract(self, parent_sequence):
         """Extract feature sequence from the supplied parent sequence.
@@ -366,15 +374,8 @@ class FeatureLocation(object):
     end = property(fget= lambda self : self._end,
                    doc="End location (possibly a fuzzy position, read only).")
 
-    def _get_nofuzzy_start(self):
-        #TODO - Do we still use the BetweenPosition class?
-        if ((self._start == self._end) and isinstance(self._start,
-             BetweenPosition)):
-            return self._start.position
-        else:
-            return min(self._start.position,
-                       self._start.position + self._start.extension)
-    nofuzzy_start = property(fget=_get_nofuzzy_start,
+    nofuzzy_start = property(
+        fget=lambda self: self._start.position,
         doc="""Start position (integer, approximated if fuzzy, read only).
 
         To get non-fuzzy attributes (ie. the position only) ask for
@@ -383,15 +384,8 @@ class FeatureLocation(object):
         (10.20)..(30.40) should return 10 for start, and 40 for end.
         """)
 
-    def _get_nofuzzy_end(self):
-        #TODO - Do we still use the BetweenPosition class?
-        if ((self._start == self._end) and isinstance(self._start,
-             BetweenPosition)):
-            return self._end.position
-        else:
-            return max(self._end.position,
-                       self._end.position + self._end.extension)
-    nofuzzy_end = property(fget=_get_nofuzzy_end,
+    nofuzzy_end = property(
+        fget=lambda self: self._end.position + self._end.extension,
         doc="""End position (integer, approximated if fuzzy, read only).
 
         To get non-fuzzy attributes (ie. the position only) ask for
@@ -405,6 +399,7 @@ class AbstractPosition(object):
     """
     def __init__(self, position, extension):
         self.position = position
+        assert extension >= 0, extension
         self.extension = extension
 
     def __repr__(self):

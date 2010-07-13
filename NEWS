@@ -9,6 +9,43 @@ The latest news is at the top.
 
 ===================================================================
 
+In progress: Biopython 1.55 (not yet released).
+
+We are phasing out support for Python 2.4. We will continue to support it
+for at least one further release (Biopython 1.56). This could be delayed
+given feedback from our users (e.g. if this proves to be a problem in
+combination with other libraries or a popular Linux distribution).
+
+The SeqRecord object now has upper and lower methods (like the Seq object and
+Python strings), which return a new SeqRecord with the sequence in upper or
+lower case and a copy of all the annotation unchanged.
+
+Several small issues with Bio.PDB have been resolved, which includes better
+handling of model numbers, and files missing the element column.
+
+Feature location parsing for GenBank and EMBL files has been rewritten,
+making the parser much faster.
+
+(At least) 6 people have contributed to this release, including 3 new people:
+
+Carlos Rios Vera (first contribution)
+Eric Talevich
+Joao Rodrigues (first contribution)
+Konstantin Okonechnikov (first contribution)
+Michiel de Hoon
+Peter Cock
+
+===================================================================
+
+May 20, 2010: Biopython 1.54 released.
+
+See the notes below for the Biopython 1.54 beta release for changes since
+Biopython 1.53 was released. Since then there have been some changes to
+the new Bio.Phylo module, more documentation, and a number of smaller
+bug fixes.
+
+===================================================================
+
 April 2, 2010: Biopython 1.54 beta released.
 
 We are phasing out support for Python 2.4. We will continue to support it
