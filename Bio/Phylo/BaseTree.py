@@ -54,7 +54,8 @@ def _sorted_attrs(elem):
     singles = []
     lists = []
     # Sort attributes for consistent results
-    for child in sorted(elem.__dict__.itervalues()):
+    for attrname, child in sorted(elem.__dict__.iteritems(),
+                                  key=lambda kv: kv[0]):
         if child is None:
             continue
         if isinstance(child, list):
@@ -487,10 +488,10 @@ class TreeMixin(object):
         loop with find_clades:
 
         >>> for clade in tree.find_clades(branch_length=True, order='level'):
-        >>>     if (clade.branch_length < .5 and
-        >>>         not clade.is_terminal() and
-        >>>         clade is not self.root):
-        >>>         tree.collapse(clade)
+        ...     if (clade.branch_length < .5 and
+        ...         not clade.is_terminal() and
+        ...         clade is not self.root):
+        ...         tree.collapse(clade)
 
         Note that level-order traversal helps avoid strange side-effects when
         modifying the tree while iterating over its clades.
@@ -625,7 +626,7 @@ class Tree(TreeElement, TreeMixin):
         @return: a tree of the same type as this class.
         """
         if isinstance(taxa, int):
-            taxa = ['taxon%s' % (i+1) for i in xrange(taxa)]
+            taxa = ['taxon%s' % (i+1) for i in range(taxa)]
         elif hasattr(taxa, '__iter__'):
             taxa = list(taxa)
         else:

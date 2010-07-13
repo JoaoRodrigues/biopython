@@ -154,9 +154,9 @@ class DBServer:
         # the default and removing the simple-minded approach.
 
         # read the file with all comment lines removed
-        sql_handle = open(sql_file, "rb")
+        sql_handle = open(sql_file, "rU")
         sql = r""
-        for line in sql_handle.xreadlines():
+        for line in sql_handle:
             if line.find("--") == 0: # don't include comment lines
                 pass
             elif line.find("#") == 0: # ditto for MySQL comments

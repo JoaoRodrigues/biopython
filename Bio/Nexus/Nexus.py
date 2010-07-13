@@ -244,7 +244,8 @@ def _sort_keys_by_values(p):
     """Returns a sorted list of keys of p sorted by values of p."""     
     startpos=[(p[pn],pn) for pn in p if p[pn]]
     startpos.sort()
-    return zip(*startpos)[1]
+    # parenthisis added because of py3k
+    return (zip(*startpos))[1]
     
 def _make_unique(l):
     """Check that all values in list are unique and return a pruned and sorted list."""
@@ -1276,12 +1277,13 @@ class Nexus(object):
         nchar_adjusted=len(cropped_matrix[undelete[0]])
         if not undelete or (undelete and undelete[0]==''):
             return
-        if isinstance(filename,str):
+        if isinstance(filename,basestring):
             try:
-                fh=open(filename,'w')
+                fh=open(filename,'w',encoding="utf-8")
             except IOError:
                 raise NexusError('Could not open %s for writing.' % filename)
-        elif hasattr(file, "write"):
+        elif hasattr(filename, 'write'):
+            #e.g. StringIO or a real file handle
             fh=filename
         else:
             raise ValueError("Neither a filename nor a handle was supplied")
@@ -1501,8 +1503,7 @@ class Nexus(object):
                 #    print 'failed'
             constant=newconstant
         cpos=[s[0] for s in constant]
-        return constant
-        # return [x[0] for x in constant]
+        return cpos
 
     def cstatus(self,site,delete=[],narrow=True):
         """Summarize character.

@@ -16,12 +16,6 @@ Functions:
 read             Parses a GenePop record (file) into a Record object.
 
 
-Obsolete classes:
-RecordParser     Parses a GenePop record (file) into a Record object.
-
-_Scanner         Scans a GenePop record.
-_RecordConsumer  Consumes GenePop data to a Record object.
-
 Partially inspired on MedLine Code.
 
 """
@@ -51,11 +45,11 @@ def read(handle):
        handle is a file-like object that contains a GenePop record.
     """
     record = Record()
-    record.comment_line = handle.next().rstrip()
+    record.comment_line = str(handle.next()).rstrip()
     #We can now have one loci per line or all loci in a single line
     #separated by either space or comma+space...
     #We will remove all commas on loci... that should not be a problem
-    sample_loci_line = handle.next().rstrip().replace(',', '')
+    sample_loci_line = str(handle.next()).rstrip().replace(',', '')
     all_loci = sample_loci_line.split(' ')
     record.loci_list.extend(all_loci)
     for line in handle:

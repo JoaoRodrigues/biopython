@@ -59,6 +59,7 @@ def get_emboss_version():
     child = subprocess.Popen(exes["embossversion"],
                              stdout=subprocess.PIPE,
                              stderr=subprocess.STDOUT,
+                             universal_newlines=True,
                              shell=(sys.platform!="win32"))
     stdout, stderr = child.communicate()
     assert stderr is None #Send to stdout instead
@@ -104,6 +105,7 @@ def emboss_convert(filename, old_format, new_format):
                              stdin=subprocess.PIPE,
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE,
+                             universal_newlines=True,
                              shell=(sys.platform!="win32"))
     child.stdin.close()
     return child.stdout
@@ -123,6 +125,7 @@ def emboss_piped_SeqIO_convert(records, old_format, new_format):
                              stdin=subprocess.PIPE,
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE,
+                             universal_newlines=True,
                              shell=(sys.platform!="win32"))
     SeqIO.write(records, child.stdin, old_format)
     child.stdin.close()
@@ -143,6 +146,7 @@ def emboss_piped_AlignIO_convert(alignments, old_format, new_format):
                              stdin=subprocess.PIPE,
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE,
+                             universal_newlines=True,
                              shell=(sys.platform!="win32"))
     AlignIO.write(alignments, child.stdin, old_format)
     child.stdin.close()
@@ -210,7 +214,7 @@ class SeqRetSeqIOTests(unittest.TestCase):
                 continue
             new_records = list(emboss_piped_SeqIO_convert(records, temp_format, "fasta"))
             try:
-                self.assert_(compare_records(records, new_records))
+                self.assertTrue(compare_records(records, new_records))
             except ValueError, err:
                 raise ValueError("Disagree on file %s %s in %s format: %s" \
                                  % (in_format, in_filename, temp_format, err))
@@ -219,7 +223,7 @@ class SeqRetSeqIOTests(unittest.TestCase):
                               skip_formats=[]):
         """Can Bio.SeqIO read seqret's conversion of the file?"""
         #TODO: Why can't we read EMBOSS's swiss output?
-        self.assert_(os.path.isfile(filename))
+        self.assertTrue(os.path.isfile(filename))
         old_records = list(SeqIO.parse(open(filename), old_format))
         for new_format in ["genbank","fasta","pir","embl", "ig"]:
             if new_format in skip_formats:
@@ -227,7 +231,7 @@ class SeqRetSeqIOTests(unittest.TestCase):
             handle = emboss_convert(filename, old_format, new_format)
             new_records = list(SeqIO.parse(handle, new_format))
             try:
-                self.assert_(compare_records(old_records, new_records))
+                self.assertTrue(compare_records(old_records, new_records))
             except ValueError, err:
                 raise ValueError("Disagree on %s file %s in %s format: %s" \
                                  % (old_format, filename, new_format, err))
@@ -289,7 +293,7 @@ class SeqRetAlignIOTests(unittest.TestCase):
     def check_EMBOSS_to_AlignIO(self, filename, old_format,
                               skip_formats=[]):
         """Can AlignIO read seqret's conversion of the file?"""
-        self.assert_(os.path.isfile(filename), filename)
+        self.assertTrue(os.path.isfile(filename), filename)
         old_aligns = list(AlignIO.parse(open(filename), old_format))
         formats = ["clustal", "phylip", "ig"]
         if len(old_aligns) == 1:
@@ -304,7 +308,7 @@ class SeqRetAlignIOTests(unittest.TestCase):
                 raise ValueError("Can't parse %s file %s in %s format." \
                                  % (old_format, filename, new_format))
             try:
-                self.assert_(compare_alignments(old_aligns, new_aligns))
+                self.assertTrue(compare_alignments(old_aligns, new_aligns))
             except ValueError, err:
                 raise ValueError("Disagree on %s file %s in %s format: %s" \
                                  % (old_format, filename, new_format, err))
@@ -335,7 +339,7 @@ class SeqRetAlignIOTests(unittest.TestCase):
                 #from writing Nexus files...
                 continue
             try:
-                self.assert_(compare_alignments(old_aligns, new_aligns))
+                self.assertTrue(compare_alignments(old_aligns, new_aligns))
             except ValueError, err:
                 raise ValueError("Disagree on file %s %s in %s format: %s" \
                                  % (in_format, in_filename, temp_format, err))
@@ -391,9 +395,9 @@ class PairwiseAlignmentTests(unittest.TestCase):
                                      % (alignment[1].id , target.id, target.name))
             if local:
                 #Local alignment
-                self.assert_(str(alignment[0].seq).replace("-","") \
+                self.assertTrue(str(alignment[0].seq).replace("-","") \
                              in query_seq)
-                self.assert_(str(alignment[1].seq).replace("-","").upper() \
+                self.assertTrue(str(alignment[1].seq).replace("-","").upper() \
                              in str(target.seq).upper())
             else:
                 #Global alignment
@@ -408,17 +412,18 @@ class PairwiseAlignmentTests(unittest.TestCase):
                                  stdin=subprocess.PIPE,
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE,
+                                 universal_newlines=True,
                                  shell=(sys.platform!="win32"))
         #Check it worked,
         return_code = child.wait()
         if return_code != 0 : print >> sys.stderr, "\n%s"%cline
         self.assertEqual(return_code, 0)
         errors = child.stderr.read().strip()
-        self.assert_(errors.startswith("Smith-Waterman local alignment"),
+        self.assertTrue(errors.startswith("Smith-Waterman local alignment"),
                      errors)
         if cline.outfile:
             self.assertEqual(child.stdout.read().strip(), "")
-            self.assert_(os.path.isfile(cline.outfile))
+            self.assertTrue(os.path.isfile(cline.outfile))
         else :
             #Don't use this yet... could return stdout handle instead?
             return child.stdout.read()
@@ -462,6 +467,7 @@ class PairwiseAlignmentTests(unittest.TestCase):
                                  stdin=subprocess.PIPE,
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE,
+                                 universal_newlines=True,
                                  shell=(sys.platform!="win32"))
         child.stdin.close()
         #Check we could read it's output
@@ -490,17 +496,18 @@ class PairwiseAlignmentTests(unittest.TestCase):
                                  stdin=subprocess.PIPE,
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE,
+                                 universal_newlines=True,
                                  shell=(sys.platform!="win32"))
         out, err = child.communicate()
         return_code = child.returncode
         #Check it worked,
         errors = err.strip()
-        self.assert_(err.strip().startswith("Needleman-Wunsch global alignment"), errors)
+        self.assertTrue(err.strip().startswith("Needleman-Wunsch global alignment"), errors)
         self.assertEqual(out.strip(), "")
         if return_code != 0 : print >> sys.stderr, "\n%s"%cline
         self.assertEqual(return_code, 0)
         filename = cline.outfile
-        self.assert_(os.path.isfile(filename))
+        self.assertTrue(os.path.isfile(filename))
         #Check we can parse the output...
         align = AlignIO.read(open(filename),"emboss")
         self.assertEqual(len(align), 2)
@@ -527,6 +534,7 @@ class PairwiseAlignmentTests(unittest.TestCase):
                                  stdin=subprocess.PIPE,
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE,
+                                 universal_newlines=True,
                                  shell=(sys.platform!="win32"))
         child.stdin.close()
         #Check we could read it's output
@@ -544,7 +552,7 @@ class PairwiseAlignmentTests(unittest.TestCase):
         query = "ACACACTCACACACACTTGGTCAGAGATGCTGTGCTTCTTGGAAGCAAGGNCTCAAAGGCAAGGTGCACGCAGAGGGACGTTTGAGTCTGGGATGAAGCATGTNCGTATTATTTATATGATGGAATTTCACGTTTTTATG"
         out_file = "Emboss/temp_test2.water"
         in_file = "Fasta/f002"
-        self.assert_(os.path.isfile(in_file))
+        self.assertTrue(os.path.isfile(in_file))
         if os.path.isfile(out_file):
             os.remove(out_file)
         cline = WaterCommandline(cmd=exes["water"])
@@ -570,7 +578,7 @@ class PairwiseAlignmentTests(unittest.TestCase):
         query = "TGTTGTAATGTTTTAATGTTTCTTCTCCCTTTAGATGTACTACGTTTGGA"
         out_file = "Emboss/temp_test3.water"
         in_file = "GenBank/cor6_6.gb"
-        self.assert_(os.path.isfile(in_file))
+        self.assertTrue(os.path.isfile(in_file))
         if os.path.isfile(out_file):
             os.remove(out_file)
         cline = WaterCommandline(cmd=exes["water"])
@@ -597,7 +605,7 @@ class PairwiseAlignmentTests(unittest.TestCase):
         query = "DVCTGKALCDPVTQNIKTYPVKIENLRVMI"
         out_file = "Emboss/temp_test4.water"
         in_file = "SwissProt/sp004"
-        self.assert_(os.path.isfile(in_file))
+        self.assertTrue(os.path.isfile(in_file))
         if os.path.isfile(out_file):
             os.remove(out_file)
         cline = WaterCommandline(cmd=exes["water"])
@@ -636,6 +644,7 @@ class PairwiseAlignmentTests(unittest.TestCase):
                                  stdin=subprocess.PIPE,
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE,
+                                 universal_newlines=True,
                                  shell=(sys.platform!="win32"))
         child.stdin.close()
         #Check we can parse the output and it is sensible...
@@ -655,9 +664,9 @@ class PairwiseAlignmentTests(unittest.TestCase):
                                  gapopen=10,
                                  gapextend=0.5,
                                  auto=True)
-        self.assert_(cline.auto)
-        self.assert_(not cline.stdout)
-        self.assert_(not cline.filter)
+        self.assertTrue(cline.auto)
+        self.assertTrue(not cline.stdout)
+        self.assertTrue(not cline.filter)
         self.assertEqual(cline.outfile, None)
         self.assertRaises(ValueError, str, cline)
 
@@ -669,9 +678,9 @@ class PairwiseAlignmentTests(unittest.TestCase):
                                  gapopen=10,
                                  gapextend=0.5,
                                  auto=True)
-        self.assert_(cline.auto)
-        self.assert_(not cline.stdout)
-        self.assert_(not cline.filter)
+        self.assertTrue(cline.auto)
+        self.assertTrue(not cline.stdout)
+        self.assertTrue(not cline.filter)
         self.assertEqual(cline.outfile, None)
         self.assertRaises(ValueError, str, cline)
    
@@ -690,6 +699,7 @@ class PairwiseAlignmentTests(unittest.TestCase):
                                  stdin=subprocess.PIPE,
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE,
+                                 universal_newlines=True,
                                  shell=(sys.platform!="win32"))
         child.stdin.close()
         #Check we could read it's output
@@ -736,6 +746,7 @@ def emboss_translate(sequence, table=None, frame=None):
                              stdin=subprocess.PIPE,
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE,
+                             universal_newlines=True,
                              shell=(sys.platform!="win32"))
     child.stdin.close()
     #Check no error output:
@@ -816,7 +827,7 @@ class TranslationTests(unittest.TestCase):
             if len(sequence) % 3 != 0:
                 sequence = sequence[:-(len(sequence)%3)]
             self.assertEqual(len(sequence) % 3, 0)
-            self.assert_(len(sequence) > 0)
+            self.assertTrue(len(sequence) > 0)
             self.check(sequence)
 
     def check(self, sequence):
@@ -824,11 +835,11 @@ class TranslationTests(unittest.TestCase):
 
         Takes a Seq object (and a filename containing it)."""
         translation = emboss_translate(sequence)
-        self.assert_(check_translation(sequence, translation))
+        self.assertTrue(check_translation(sequence, translation))
 
         for table in [1,2,3,4,5,6,9,10,11,12,13,14,15,16,21,22,23]:
             translation = emboss_translate(sequence, table)
-            self.assert_(check_translation(sequence, translation, table))
+            self.assertTrue(check_translation(sequence, translation, table))
         return True
 
     def translate_all_codons(self, letters):

@@ -32,6 +32,7 @@ def check_mafft_version(mafft_exe):
     child = subprocess.Popen("%s --help" % mafft_exe,
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE,
+                             universal_newlines=True,
                              shell=(sys.platform!="win32"))
     stdoutdata, stderrdata = child.communicate()
     output = stdoutdata + "\n" + stderrdata
@@ -77,14 +78,15 @@ class MafftApplication(unittest.TestCase):
         child = subprocess.Popen(str(cmdline),
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE,
+                                 universal_newlines=True,
                                  shell=(sys.platform!="win32"))
         stdoutdata, stderrdata = child.communicate()
         return_code = child.returncode
         self.assertEqual(return_code, 0, "Got error code %i back from:\n%s"
                          % (return_code, cmdline))
-        self.assert_(stdoutdata.startswith(">gi|1348912|gb|G26680|G26680"))
-        self.assert_("Progressive alignment ..." in stderrdata, stderrdata)
-        self.assert_("$#=0" not in stderrdata)
+        self.assertTrue(stdoutdata.startswith(">gi|1348912|gb|G26680|G26680"))
+        self.assertTrue("Progressive alignment ..." in stderrdata, stderrdata)
+        self.assertTrue("$#=0" not in stderrdata)
         del child
 
     def test_Mafft_with_options(self):
@@ -99,13 +101,14 @@ class MafftApplication(unittest.TestCase):
         child = subprocess.Popen(str(cmdline),
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE,
+                                 universal_newlines=True,
                                  shell=(sys.platform!="win32"))
         stdoutdata, stderrdata = child.communicate()
         return_code = child.returncode
         self.assertEqual(return_code, 0, "Got error code %i back from:\n%s"
                          % (return_code, cmdline))
-        self.assert_(stdoutdata.startswith(">gi|1348912|gb|G26680|G26680"))
-        self.assert_("$#=0" not in stderrdata)
+        self.assertTrue(stdoutdata.startswith(">gi|1348912|gb|G26680|G26680"))
+        self.assertTrue("$#=0" not in stderrdata)
         del child
 
     def test_Mafft_with_Clustalw_output(self):
@@ -118,6 +121,7 @@ class MafftApplication(unittest.TestCase):
         child = subprocess.Popen(str(cmdline),
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE,
+                                 universal_newlines=True,
                                  shell=(sys.platform!="win32"))
         stdoutdata, stderrdata = child.communicate()
         return_code = child.returncode
@@ -125,8 +129,8 @@ class MafftApplication(unittest.TestCase):
                          % (return_code, cmdline))
         #e.g. "CLUSTAL format alignment by MAFFT ..."
         #or "CLUSTAL (-like) formatted alignment by MAFFT FFT-NS-2 (v6.240)"
-        self.assert_(stdoutdata.startswith("CLUSTAL"), stdoutdata)
-        self.assert_("$#=0" not in stderrdata)
+        self.assertTrue(stdoutdata.startswith("CLUSTAL"), stdoutdata)
+        self.assertTrue("$#=0" not in stderrdata)
         del child
 
     def test_Mafft_with_complex_command_line(self):
@@ -154,13 +158,14 @@ class MafftApplication(unittest.TestCase):
         child = subprocess.Popen(str(cmdline),
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE,
+                                 universal_newlines=True,
                                  shell=(sys.platform!="win32"))
         stdoutdata, stderrdata = child.communicate()
         return_code = child.returncode
         self.assertEqual(return_code, 0, "Got error code %i back from:\n%s"
                          % (return_code, cmdline))
-        self.assert_(stdoutdata.startswith(">gi|1348912|gb|G26680|G26680"))
-        self.assert_("$#=0" not in stderrdata)
+        self.assertTrue(stdoutdata.startswith(">gi|1348912|gb|G26680|G26680"))
+        self.assertTrue("$#=0" not in stderrdata)
         del child
 
 if __name__ == "__main__":

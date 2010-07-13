@@ -54,10 +54,11 @@ class ProbconsApplication(unittest.TestCase):
         child = subprocess.Popen(str(cmdline),
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE,
+                                 universal_newlines=True,
                                  shell=(sys.platform!="win32"))
         return_code = child.wait()
         self.assertEqual(return_code, 0)
-        self.assert_(child.stderr.read().strip().startswith("PROGRAM: T-COFFEE"))
+        self.assertTrue(child.stderr.read().strip().startswith("PROGRAM: T-COFFEE"))
         align = AlignIO.read(open(self.outfile1), "clustal")
         records = list(SeqIO.parse(open(self.infile1),"fasta"))
         self.assertEqual(len(records),len(align))
@@ -78,10 +79,11 @@ class ProbconsApplication(unittest.TestCase):
         child = subprocess.Popen(str(cmdline),
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE,
+                                 universal_newlines=True,
                                  shell=(sys.platform!="win32"))
         return_code = child.wait()
         self.assertEqual(return_code, 0)
-        self.assertEquals(child.stderr.read(), "")
+        self.assertEqual(child.stderr.read(), "")
         align = AlignIO.read(open(self.outfile3), "pir")
         records = list(SeqIO.parse(open(self.infile1),"fasta"))
         self.assertEqual(len(records),len(align))
@@ -106,10 +108,11 @@ class ProbconsApplication(unittest.TestCase):
         child = subprocess.Popen(str(cmdline),
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE,
+                                 universal_newlines=True,
                                  shell=(sys.platform!="win32"))
         return_code = child.wait()
         self.assertEqual(return_code, 0)
-        self.assert_(child.stderr.read().strip().startswith("PROGRAM: T-COFFEE"))
+        self.assertTrue(child.stderr.read().strip().startswith("PROGRAM: T-COFFEE"))
         align = AlignIO.read(open(self.outfile4), "clustal")
         records = list(SeqIO.parse(open(self.infile1),"fasta"))
         self.assertEqual(len(records),len(align))
