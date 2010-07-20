@@ -67,19 +67,16 @@ class Atom:
         self.serial_number=serial_number
         # Dictionary that keeps addictional properties
         self.xtra={}
-<<<<<<< HEAD
-        
+                
         # Is HETATM?
         self.hetatm = False if hetero_flag == " " else True
 
         # Atom Element
         if not element or not IUPACData.atom_weigths.has_key(element):
-=======
-        if not element:
->>>>>>> master
+
             import warnings
             from PDBExceptions import PDBConstructionWarning
-            warnings.warn("Atom object (name=%s) without element or element not recognized (%s)" % (name, element),
+            warnings.warn("Atom object (name=%s) without element or element not recognized ('%s')" % (name, element),
                           PDBConstructionWarning)
             
             # Try to get element from atom name
