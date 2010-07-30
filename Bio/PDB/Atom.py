@@ -81,6 +81,7 @@ class Atom:
             
             # Try to get element from atom name
             # HETATM check to clear ambiguities (CA: calcium, c/alpha ; HG: mercury, gamma hydrogen ; etc)
+            # In cases of MSE for example, that count as HETATM, the elements will come out wrong .. fix?
             if self.hetatm:
                 putative_element = self.name
             else:

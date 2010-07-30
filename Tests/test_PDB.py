@@ -754,6 +754,17 @@ class GSOC2010_Test(unittest.TestCase):
         struct = self.s_3IGM
         
         self.assertEqual(0, struct.remove_disordered_atoms())
+    
+    def test_AtomElement(self):
+        """ Atom Element """
+        
+        struct = self.s_1A8O
+        
+        atoms = [a for a in struct.get_atoms()]
+        
+        self.assertEqual('C', atoms[9].element) # CA
+        self.assertEqual('C', atoms[10].element) # CA        
+        
         
         
 # -------------------------------------------------------------
