@@ -68,17 +68,18 @@ class Structure(Entity):
             Keeps numbering consistent with gaps if they exist in the original numbering.
         """
         
-        for m in self:
-            for c in m:
-                fresidue_num = c.get_list()[0].get_id()[1]
+        for model in self:
+            for chain in model:
+                fresidue_num = chain.get_list()[0].get_id()[1]
                 displace = begin - fresidue_num
-                for r in c:
-                    r.id = (r.id[0], r.id[1]+displace, r.id[2])
+                for res in chain:
+                    res.id = (res.id[0], res.id[1]+displace, res.id[2])
         
     def build_biological_unit(self):
         """ Uses information from header to build full biological unit assembly.
             Each new subunit is added to the structure as a new MODEL record.
             Identity matrix is ignored.
+            Returns an integer with the number of matrices used.
         """
         
         from copy import deepcopy # To copy structure object
@@ -86,7 +87,8 @@ class Structure(Entity):
         if self.header['biological_unit']:
             biomt_data = self.header['biological_unit'][1:] # 1st is identity
         else:
-            return "PDB File lacks appropriate REMARK 350 entries to build Biological Unit."
+            return "PDB File lacks appropriate REMARK 350 \
+                    entries to build Biological Unit."
 
         temp = [] # container for new models
         seed = 0 # Seed for model numbers
@@ -133,19 +135,19 @@ class Structure(Entity):
                 substitutions += 1
                 
                 if verbose:
-                    print "Residue %s:%s has %s disordered atoms: %s" %(   residue.resname, residue.get_id()[1],
-                                                                            len(disordered), 
-                                                                            '/'.join([ d.name for d in disordered ])
+                    print "Residue %s:%s has %s disordered atoms: %s" % (residue.resname, residue.get_id()[1],
+                                                                         len(disordered), 
+                                                                         '/'.join([ d.name for d in disordered ])
                                                                         )
             
                 for atom in disordered:
                     try:
                         a = atom.disordered_get(keep_loc)
                     except KeyError: # Descriptive Enough
-                        print "Atomic Position %s not found for %s (%s:%s)" %(  keep_loc, 
-                                                                                atom, 
-                                                                                residue.resname, 
-                                                                                residue.get_id()[1])
+                        print "Atomic Position %s not found for %s (%s:%s)" % (keep_loc, 
+                                                                              atom, 
+                                                                              residue.resname, 
+                                                                              residue.get_id()[1])
                         continue
                 
                     a.disordered_flag = 0
