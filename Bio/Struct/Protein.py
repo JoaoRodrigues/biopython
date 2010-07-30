@@ -6,18 +6,20 @@
 from copy import deepcopy
 
 from Bio.PDB.Structure import Structure
-from Bio.PDB.Entity import Entity
 from Bio.PDB.Polypeptide import is_aa
 
 class Protein(Structure):
     
-    def __init__(self, id):
+    def __init__(self, struct_id):
         
-        Structure.__init__(self, id)
+        Structure.__init__(self, struct_id)
         
     @classmethod
     def from_structure(cls, original, filter_residues):
-        
+        """
+        Loads structure as a protein, exposing
+        protein-specific methods.
+        """
         P = cls(original.id)
         P.full_id = original.full_id
         
@@ -26,10 +28,17 @@ class Protein(Structure):
             P.add(copycat)
         
         # Discriminate non-residues (is_aa function)
+        remove_list = []
         if filter_residues:
             for model in P:
                 for chain in model:
-                    map(chain.detach_child, [res.id for res in chain.child_list if not is_aa(res)])
+                    for residue in chain:
+                        if residue.get_id()[0] != ' ' or not is_aa(residue):
+                            remove_list.append(residue)
+            
+            for residue in remove_list:
+                residue.parent.detach_child(residue.id)
+            
             for chain in P.get_chains(): # Remove empty chains
                 if not len(chain.child_list):
                     model.detach_child(chain.id)
@@ -40,7 +49,8 @@ class Protein(Structure):
         return P
           
     def search_ss_bonds(self, threshold=3.0):
-        """ Searches S-S bonds based on distances between atoms in the structure (first model only).
+        """ Searches S-S bonds based on distances
+            between atoms in the structure (first model only).
             Average distance is 2.05A. Threshold is 3A default.
             Returns iterator with tuples of residues.
         """
@@ -48,7 +58,7 @@ class Protein(Structure):
         from itertools import combinations
         
         model = self.child_list[0]
-        cysteines = filter( (lambda r: r.get_resname() == 'CYS'), model.get_residues() )
+        cysteines = [r for r in model.get_residues() if r.get_resname() == 'CYS']
 
         pairs = combinations(cysteines, 2) # Iterator with pairs
 
