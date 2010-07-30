@@ -707,6 +707,55 @@ class NeighborTest(unittest.TestCase):
             hits = ns.search_all(5.0)
             self.assertTrue(hits >= 0)
 
+class GSOC2010_Test(unittest.TestCase):
+    """ Testing the new features of Structure.py
+        added in the GSOC 2010 plan.    """
+        
+    def setUp(self):
+        warnings.resetwarnings()
+        warnings.simplefilter('ignore', PDBConstructionWarning)
+
+        self.parser = PDBParser()
+        # DNA + Protein
+        self.s_3IGM = self.parser.get_structure("3igm", "PDB/3IGM.pdb")
+        # Two components for Bio unit, one is identity matrix
+        self.s_1A8O = self.parser.get_structure("1a8o", "PDB/1A8O.pdb")
+                        
+    def test_as_protein(self):
+        """ Structure to Protein conversion """
+        
+        # DNA + Protein
+        struct = self.s_3IGM
+        prot = struct.as_protein()
+        
+        self.assertEqual(246, len(list(struct.get_residues())))
+        self.assertEqual(118, len(list(prot.get_residues())))
+
+    def test_renumber(self):
+        """ Renumber residues """
+
+        struct = self.s_3IGM
+
+        first_residue = list(struct.get_residues())[0]
+        struct.renumber_residues()
+        self.assertEqual(1, first_residue.get_id()[1])
+
+    def test_biological_unit(self):
+        """ Build Biological Unit """
+
+        struct = self.s_1A8O
+    
+        self.assertEqual(1, struct.build_biological_unit())
+        
+    def test_remove_disordered_atoms(self):
+        """ Remove disordered atoms """       
+
+        # 0 Disordered Atoms
+        struct = self.s_3IGM
+        
+        self.assertEqual(0, struct.remove_disordered_atoms())
+        
+        
 # -------------------------------------------------------------
 
 if __name__ == '__main__':
