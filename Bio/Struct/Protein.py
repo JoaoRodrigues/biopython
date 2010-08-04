@@ -108,67 +108,48 @@ class Protein(Structure):
         return missing_atoms
         
     
-    def coarse_grain(self, cg_type="CA"):
+    def coarse_grain(self, cg_type="CA_TRACE"):
         """ 
-            Reduces the protein structure complexity to a few atoms per residue.
-            Arguments:
-              - ori_entity: Structure, Model, Chain, or List of Residues.
+            Reduces the protein structure complexity to a few (pseudo-)atoms per residue.
+
             Parameters:
-              - cg_type:      CA (Ca-only) [Default]
-                              3pt (Ca + O + Side-chain C.o.M)
+              - cg_type:      CA_TRACE (Ca-only) [Default]
+                              ENCAD_3P (CA, O, SC Beads)
+                              MARTINI (CA, O, SC Beads)
+            
             Returns a new structure object.
         """
-    
-        from Bio.Struct.Geometry import center_of_mass
-    
-        entity = deepcopy(self.child_list[0]) # First model
         
-        residue_list = entity.get_residues()
+        # Import CG Types
         
-        # if isinstance(entity, Entity): # S,M,C
-        #     residue_list = entity.get_residues()
-        # elif hasattr(entity, "__iter__") and filter(lambda x: x.level == 'R', entity): # list of R
-        #     residue_list = entity
-        # else: # Some other weirdo object
-        #     raise ValueError('You can only use coarse grain on Structure, Model, Chain, or list of Residue(s).')
+        import CG_Models
         
-        if cg_type == "CA":
-            for residue in residue_list:
-                for atom_name in residue.child_dict.keys():
-                    if atom_name != 'CA':
-                        residue.detach_child(atom_name)
-    
-        elif cg_type == "3pt":
+        CG_Library = {  "CA_TRACE": CG_Models.CA_TRACE,
+                        "ENCAD_3P": CG_Models.ENCAD_3P,
+                        "MARTINI":  CG_Models.MARTINI   }
         
-            from Bio.PDB.Atom import Atom # To add C.O.M
+        CG_Method = CG_Library[cg_type]
         
-            for residue in residue_list:
+        # Creates a brand new structure object
+        from Bio.PDB.StructureBuilder import StructureBuilder
+        
+        structure_builder=StructureBuilder()
+        
+        cg_id = "CG_" + self.id
+        structure_builder.init_structure(cg_id)
+        structure_builder.init_seg(' ') # Empty SEGID
 
-                side_chain_atoms = []
-                for atom in residue.child_dict.keys():
-                    if atom in ['N', 'C']:
-                        residue.detach_child(atom)
-                    elif atom not in ['CA', 'O']:
-                        side_chain_atoms.append(residue[atom])
-                        residue.detach_child(atom)
-                if len(side_chain_atoms) == 1: # Alanine
-                    sc_com = side_chain_atoms[0]
-                    sc_com.name = 'CMA'
-                    residue.add(sc_com)                    
-                elif len(side_chain_atoms) > 1:
-                    sc_com_coord = center_of_mass(side_chain_atoms)
-                    if residue.resname in ['GLU', 'ASP']:
-                        sc_com = Atom('CMA', sc_com_coord, 0, 0, ' ', 'CMA', 0, 'O')
-                    elif residue.resname in ['LYS', 'ARG', 'HIS']:
-                        sc_com = Atom('CMA', sc_com_coord, 0, 0, ' ', 'CMA', 0, 'N')
-                    elif residue.resname == 'CYS':
-                        sc_com = Atom('CMA', sc_com_coord, 0, 0, ' ', 'CMA', 0, 'S')
-                    else:
-                        sc_com = Atom('CMA', sc_com_coord, 0, 0, ' ', 'CMA', 0, 'C')
+        for model in self:
+            structure_builder.init_model(model.id)
+            
+            for chain in model:
+                structure_builder.init_chain(chain.id)
+                cur_chain = structure_builder.chain
 
-                    residue.add(sc_com)
-                          
-        else:
-            raise ValueError("Invalid Coarse Graining Type: %s. Check __doc__ for supported values." %cg_type)
+                for residue in chain:
+                    cg_residue = CG_Method(residue)
+                    cur_chain.add(cg_residue)
         
-        return entity  
+        cg_structure = structure_builder.get_structure()
+        
+        return cg_structure  
