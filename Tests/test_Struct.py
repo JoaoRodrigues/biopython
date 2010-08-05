@@ -57,6 +57,24 @@ class test_Protein(unittest.TestCase):
         p = self.p
         missing = p.check_missing_atoms()
         self.assertEqual(0, len( missing.keys() ))
+    
+    def test_CoarseGrained(self):
+        """Coarse Grained Models """
+        
+        p = self.p
+        
+        # CA
+        cg_model = p.coarse_grain()
+        self.assertEqual(66, len([i for i in cg_model.get_atoms()])
+
+        # ENCAD
+        cg_model = p.coarse_grain('ENCAD_3P')
+        self.assertEqual(194, len([i for i in cg_model.get_atoms()])
+
+
+        # MARTINI
+        cg_model = p.coarse_grain('MARTINI')
+        self.assertEqual(142, len([i for i in cg_model.get_atoms()]) 
         
         
 if __name__ == '__main__':
