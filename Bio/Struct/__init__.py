@@ -19,3 +19,29 @@ def read( handle, id=None ):
     s = p.get_structure(id, handle)
 
     return s
+
+def write( structure, name=None ):
+
+    from Bio.PDB import PDBIO
+    
+    io = PDBIO()
+    
+    io.set_structure(structure)
+    
+    if not name:
+        s_name = structure.id
+    else:
+        s_name = name
+        
+    while 1:
+        name = "%s.pdb" %s_name
+        if os.path.exists(name):
+            seed = 0
+            name = "%s_%s.pdb" %(s_name, seed)
+            seed +=1
+        else:
+            break
+                
+        io.save(name)
+        
+    return name
