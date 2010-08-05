@@ -138,8 +138,21 @@ def MARTINI(residue):
             # S1, S2, S3, or S4
             name = "S%s" % (int(conversion_table[residue_name].index(cg_residue[atom].name)) + 1)
             cg_residue[atom].name = name
+            cg_residue[atom].fullname = " %s " %name
             cg_residue[atom].id = name
-        elif not cg_residue[atom].name in ["CA", "O"]:
-            cg_residue.detach_child(cg_residue[atom].name)    
+
+            
+        elif cg_residue[atom].name == "CA":
+            cg_residue[atom].name = "BB"
+            cg_residue[atom].fullname = " BB "
+            cg_residue[atom].id = "BB"
+                        
+        else:
+            cg_residue.detach_child(cg_residue[atom].name)
+
+        cg_residue[atom].occupancy = int(cg_residue[atom].occupancy)
+        cg_residue[atom].bfactor = int(cg_residue[atom].bfactor)
+        cg_residue[atom].coord = [ int(xyz) for xyz in cg_residue[atom].coord ]
+            
             
     return cg_residue
