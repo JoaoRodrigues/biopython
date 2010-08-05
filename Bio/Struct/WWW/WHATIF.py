@@ -115,7 +115,10 @@ class WHATIF:
 
         elif isinstance(structure, str): # String
             s = structure
-
+        
+        else:
+            raise ValueError('Unknown format. Use SMCRA object or string.')
+            
         u = urllib.urlopen("http://www.cmbi.ru.nl/wiwsd/rest/UploadPDB", s)
         x = xml.dom.minidom.parse(u)
         
@@ -132,7 +135,7 @@ class WHATIF:
         print _WARNING
         # Protonated Structure in XML Format
         h_s_xml = urllib.urlopen("http://www.cmbi.ru.nl/wiwsd/rest/PDBasXMLwithSymwithPolarH/id/" + id)
-
+        self.raw = h_s_xml
         p = self.parser
         h_s_smcra = p.read(h_s_xml, 'WHATIF_Output')
         
