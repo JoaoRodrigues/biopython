@@ -9,6 +9,10 @@
 import os
 
 def read( handle, id=None ):
+    """
+    Reads a structure via PDBParser.
+    Simplifies life..
+    """
 
     from Bio.PDB import PDBParser
     
@@ -21,7 +25,11 @@ def read( handle, id=None ):
     return s
 
 def write( structure, name=None ):
-
+    """
+    Writes a Structure in PDB format through PDBIO.
+    Simplifies life..
+    """
+    
     from Bio.PDB import PDBIO
     
     io = PDBIO()
@@ -32,16 +40,17 @@ def write( structure, name=None ):
         s_name = structure.id
     else:
         s_name = name
+
+    name = "%s.pdb" %s_name
+    seed = 0
         
     while 1:
-        name = "%s.pdb" %s_name
         if os.path.exists(name):
-            seed = 0
             name = "%s_%s.pdb" %(s_name, seed)
             seed +=1
         else:
             break
                 
-        io.save(name)
+    io.save(name)
         
     return name
