@@ -69,7 +69,7 @@ class Atom:
         self.xtra={}
                 
         # Is HETATM?
-        self.hetatm = False if hetero_flag == " " else True
+        self.hetatm = (hetero_flag == " ")
 
         # Atom Element
         if not element or not IUPACData.atom_weigths.has_key(element):
@@ -81,11 +81,17 @@ class Atom:
             
             # Try to get element from atom name
             # HETATM check to clear ambiguities (CA: calcium, c/alpha ; HG: mercury, gamma hydrogen ; etc)
-            # In cases of MSE for example, that count as HETATM, the elements will come out wrong .. fix?
+            # In cases of MSE for example, that count as HETATM, the elements will come out wrong .. how to fix?
+            # Does not work for metals..
+            
             if self.hetatm:
                 putative_element = self.name
             else:
-                putative_element = self.name[0] if not self.name[0].isdigit() else self.name[1] # Hs may have digit in [0]
+                 # Hs may have digit in [0]
+                if not self.name[0].isdigit():
+                    putative_element = self.name[0] 
+                else:
+                    putative_element = self.name[1]
             
             if IUPACData.atom_weigths.has_key(putative_element):
                 warnings.warn("Atom object (name=%s) assigned element %s based on atom name" % (name, putative_element),
