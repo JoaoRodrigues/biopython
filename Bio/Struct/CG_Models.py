@@ -15,7 +15,7 @@ from Bio.PDB.Atom import Atom
 
 def CA_TRACE(residue):
     """
-    Reduces complexity of protein residue to the alpha carbon:
+    Reduces protein residues to the alpha carbon:
     CA trace only.
     """
 
@@ -31,6 +31,8 @@ def ENCAD_3P(residue):
     """
     Reduces complexity of protein residue to a 3 points coarse grained model:
     CA, O, Bead in specific atom location.
+    
+    Based on Michael Levitt's ENCAD coarse graining model (2010).
     """
     
     conversion_table = {
@@ -140,19 +142,19 @@ def MARTINI(residue):
             cg_residue[atom].name = name
             cg_residue[atom].fullname = " %s " %name
             cg_residue[atom].id = name
-
+            cg_residue[atom].occupancy = int(cg_residue[atom].occupancy)
+            cg_residue[atom].bfactor = int(cg_residue[atom].bfactor)
+            cg_residue[atom].coord = [ int(xyz) for xyz in cg_residue[atom].coord ]
             
         elif cg_residue[atom].name == "CA":
             cg_residue[atom].name = "BB"
             cg_residue[atom].fullname = " BB "
             cg_residue[atom].id = "BB"
-                        
+            cg_residue[atom].occupancy = int(cg_residue[atom].occupancy)
+            cg_residue[atom].bfactor = int(cg_residue[atom].bfactor)
+            cg_residue[atom].coord = [ int(xyz) for xyz in cg_residue[atom].coord ]                        
         else:
             cg_residue.detach_child(cg_residue[atom].name)
-
-        cg_residue[atom].occupancy = int(cg_residue[atom].occupancy)
-        cg_residue[atom].bfactor = int(cg_residue[atom].bfactor)
-        cg_residue[atom].coord = [ int(xyz) for xyz in cg_residue[atom].coord ]
             
             
     return cg_residue
