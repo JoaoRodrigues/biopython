@@ -54,8 +54,31 @@ class Protein(Structure):
             Average distance is 2.05A. Threshold is 3A default.
             Returns iterator with tuples of residues.
         """
+        
+        # Taken from http://docs.python.org/library/itertools.html
+        # Python 2.4 does not include itertools.combinations
 
-        from itertools import combinations
+        def combinations(iterable, r):
+            # combinations('ABCD', 2) --> AB AC AD BC BD CD
+            # combinations(range(4), 3) --> 012 013 023 123
+            pool = tuple(iterable)
+            n = len(pool)
+            if r > n:
+                return
+            indices = range(r)
+            yield tuple(pool[i] for i in indices)
+            while True:
+                for i in reversed(range(r)):
+                    if indices[i] != i + n - r:
+                        break
+                else:
+                    return
+                indices[i] += 1
+                for j in range(i+1, r):
+                    indices[j] = indices[j-1] + 1
+                yield tuple(pool[i] for i in indices)
+
+        
         
         model = self.child_list[0]
         cysteines = [r for r in model.get_residues() if r.get_resname() == 'CYS']
@@ -152,4 +175,26 @@ class Protein(Structure):
         
         cg_structure = structure_builder.get_structure()
         
-        return cg_structure  
+        return cg_structure
+
+
+    def find_seq_homologues(self, threshold):
+        """
+        Uses NCBI BLAST to look for structures deposited in the PDB database
+        that share sequence homology with the target protein/chain.
+        Bridges to Bio.BLAST.NCBIWWW.
+        """
+
+        from Bio.SCOP.Raf import to_one_letter_code
+        
+        s = self
+        seq_iter = s.get_residues()
+        seq_str = ''
+
+        for aa in seq_iter:
+            if aa.resname in to_one_letter_code:
+                seq_str += aa.resname
+        
+        return seq_str
+        
+        
