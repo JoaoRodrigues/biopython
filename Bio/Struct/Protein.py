@@ -178,13 +178,17 @@ class Protein(Structure):
         return cg_structure
 
 
-    def find_seq_homologues(self, threshold):
+    def find_seq_homologues(self, return_raw=False):
         """
         Uses NCBI BLAST to look for structures deposited in the PDB database
-        that share sequence homology with the target protein/chain.
+        that share __sequence__ homology with the target protein/chain.
         Bridges to Bio.BLAST.NCBIWWW.
         """
-
+        
+        
+        # Get sequence from structure/chain
+        # We could use Bio.PDB.Polypeptide?
+        
         from Bio.SCOP.Raf import to_one_letter_code
         
         s = self
@@ -193,8 +197,57 @@ class Protein(Structure):
 
         for aa in seq_iter:
             if aa.resname in to_one_letter_code:
-                seq_str += aa.resname
+                seq_str += to_one_letter_code[aa.resname]
         
-        return seq_str
+        # Use BLAST to find homologous sequences with associated
+        # structures in the PDB database.
+        # Perhaps include local BLAST?
         
+        from Bio.Blast.NCBIWWW import qblast
+
+        # Adapt for short query sequences if needed
+        # From http://www.ncbi.nlm.nih.gov/blast/producttable.shtml#shortp
         
+        if len(seq_str) < 15:
+            word_size = 2
+            expect = 20000
+            matrix_name = 'PAM30'
+            filter = None
+        else:
+            word_size = 3
+            expect = 10.0
+            matrix_name = 'BLOSUM62'
+            filter = 'SEG'
+             
+        query_result = qblast(  "blastp", "pdb", seq_str, 
+                                word_size, expect, matrix_name, filter)
+        
+        if return_raw:
+           return query_result 
+            
+        # Parse BLAST result to yield results
+        # PDBID : (E-Value, Identity, Positives, Gaps, Alignment)
+        
+        from Bio.Blast import NCBIXML
+        
+        blast_records = NCBIXML.read(query_result)
+        
+        results = []
+        
+        for alignment in blast_records.alignments:
+            for hsps in alignment.hsps:
+                id_perc = "%s/%s" %(hsps.identities, alignment.length)
+                pos_perc = "%s/%s" %(hsps.positives, alignment.length)
+                gaps_perc = "%s/%s" %(hsps.gaps, alignment.length)
+
+                pdb_id = alignment.title.split('|')[3]
+                e_value = hsps.expect
+                
+                results.append( ( pdb_id,
+                                "%2.5e" %e_value,
+                                id_perc, 
+                                pos_perc, 
+                                gaps_perc,
+                                '\n'.join([hsps.query, hsps.match, hsps.sbjct]) ) )
+
+        return results
