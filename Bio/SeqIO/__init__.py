@@ -227,6 +227,7 @@ names are also used in Bio.AlignIO and include the following:
  - pir     - A "FASTA like" format introduced by the National Biomedical
              Research Foundation (NBRF) for the Protein Information Resource
              (PIR) database, now part of UniProt.
+ - mpir    - A modified version of the PIR format used by MODELLER.
  - sff     - Standard Flowgram Format (SFF), typical output from Roche 454.
  - sff-trim - Standard Flowgram Format (SFF) with given trimming applied.
  - swiss   - Plain text Swiss-Prot aka UniProt format.
@@ -307,6 +308,7 @@ import SffIO
 import SwissIO
 import TabIO
 import QualityIO #FastQ and qual files
+import mPirIO
 
 
 #Convention for format names is "mainname-subtype" in lower case.
@@ -330,6 +332,7 @@ _FormatToIterator = {"fasta" : FastaIO.FastaIterator,
                      "ace" : AceIO.AceIterator,
                      "tab" : TabIO.TabIterator,
                      "pir" : PirIO.PirIterator,
+                     "mpir": mPirIO.mPirIterator,
                      "fastq" : QualityIO.FastqPhredIterator,
                      "fastq-sanger" : QualityIO.FastqPhredIterator,
                      "fastq-solexa" : QualityIO.FastqSolexaIterator,
