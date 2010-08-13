@@ -308,8 +308,6 @@ import SffIO
 import SwissIO
 import TabIO
 import QualityIO #FastQ and qual files
-import mPirIO
-
 
 #Convention for format names is "mainname-subtype" in lower case.
 #Please use the same names as BioPerl or EMBOSS where possible.
@@ -332,7 +330,7 @@ _FormatToIterator = {"fasta" : FastaIO.FastaIterator,
                      "ace" : AceIO.AceIterator,
                      "tab" : TabIO.TabIterator,
                      "pir" : PirIO.PirIterator,
-                     "mpir": mPirIO.mPirIterator,
+                     "pir-modeller": PirIO.PirModellerIterator,
                      "fastq" : QualityIO.FastqPhredIterator,
                      "fastq-sanger" : QualityIO.FastqPhredIterator,
                      "fastq-solexa" : QualityIO.FastqSolexaIterator,
