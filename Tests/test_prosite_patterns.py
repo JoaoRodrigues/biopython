@@ -4,6 +4,7 @@
 # as part of this package.
 
 import os
+import sys
 import unittest
 
 if os.name == 'java':
@@ -14,14 +15,22 @@ if os.name == 'java':
         #This is a slight miss-use of MissingExternalDependencyError,
         #but it will do in the short term to skip this unit test on Jython
         raise MissingExternalDependencyError(\
-            "The (deprecated) Bio.Prosite.Pattern uses the Python "
+            "The (deprecated) Bio.Prosite.Pattern module uses Python "
             "function buffer which is not supported on Jython, see "
             "http://bugs.jython.org/issue1521")
 
+if sys.version_info[0] >= 3:
+    #This is a slight miss-use of MissingExternalDependencyError,
+    #but it will do in the short term to skip this unit test on Python 3
+    from Bio import MissingExternalDependencyError
+    raise MissingExternalDependencyError(\
+        "This deprecated module doesn't work on Python 3.")
+        
 import warnings
-warnings.filterwarnings("ignore", category=DeprecationWarning)
+from Bio import BiopythonDeprecationWarning
+warnings.filterwarnings("ignore", category=BiopythonDeprecationWarning)
 from Bio.Prosite import Pattern
-warnings.resetwarnings()
+warnings.filters.pop()
 
 from Bio import Seq
 

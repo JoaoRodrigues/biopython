@@ -1,5 +1,6 @@
 # Copyright 2001 Brad Chapman.
 # Revisions copyright 2009-2010 by Peter Cock.
+# Revisions copyright 2010 by Phillip Garland.
 # All rights reserved.
 # This code is part of the Biopython distribution and governed by its
 # license.  Please see the LICENSE file that should have been included
@@ -23,7 +24,13 @@ Wrappers for the new NCBI BLAST+ tools (written in C++):
 - NcbipsiblastCommandline - Position-Specific Initiated BLAST
 - NcbirpsblastCommandline - Reverse Position Specific BLAST
 - NcbirpstblastnCommandline - Translated Reverse Position Specific BLAST
+- NcbiblastformatterCommandline - Convert ASN.1 to other BLAST output formats
 
+For further details, see:
+
+Camacho et al. BLAST+: architecture and applications
+BMC Bioinformatics 2009, 10:421
+doi:10.1186/1471-2105-10-421
 """
 from Bio.Application import _Option, AbstractCommandline, _Switch
 
@@ -166,11 +173,13 @@ class BlastallCommandline(_BlastAllOrPgpCommandLine):
     >>> print cline
     blastall -d nr -i m_cold.fasta -e 0.001 -p blastx
 
-    You would typically run the command line with the Python subprocess module,
-    as described in the Biopython tutorial.
+    You would typically run the command line with cline() or via the Python
+    subprocess module, as described in the Biopython tutorial.
     """
     #TODO - This could use more checking for valid parameters to the program.
     def __init__(self, cmd="blastall",**kwargs):
+        import warnings
+        warnings.warn("Like blastall, this wrapper is now obsolete, and will be deprecated and removed in a future release of Biopython.", PendingDeprecationWarning)
         self.parameters = [ \
             #Sorted in the same order as the output from blastall --help
             #which should make it easier to keep them up to date in future.
@@ -251,10 +260,12 @@ class BlastpgpCommandline(_BlastAllOrPgpCommandLine):
     >>> print cline
     blastpgp --help
 
-    You would typically run the command line with the Python subprocess module,
-    as described in the Biopython tutorial.
+    You would typically run the command line with cline() or via the Python
+    subprocess module, as described in the Biopython tutorial.
     """
     def __init__(self, cmd="blastpgp",**kwargs):
+        import warnings
+        warnings.warn("Like blastpgp (and blastall), this wrapper is now obsolete, and will be deprecated and removed in a future release of Biopython.", PendingDeprecationWarning)
         self.parameters = [ \
            _Option(["-C", "checkpoint_outfile"], ["output", "file"], None, 0,
                    "Output file for PSI-BLAST checkpointing.", False),
@@ -308,10 +319,12 @@ class RpsBlastCommandline(_BlastCommandLine):
     >>> print cline
     rpsblast --help
 
-    You would typically run the command line with the Python subprocess module,
-    as described in the Biopython tutorial.
+    You would typically run the command line with cline() or via the Python
+    subprocess module, as described in the Biopython tutorial.
     """
     def __init__(self, cmd="rpsblast",**kwargs):
+        import warnings
+        warnings.warn("Like the old rpsblast (and blastall), this wrapper is now obsolete, and will be deprecated and removed in a future release of Biopython.", PendingDeprecationWarning)
         self.parameters = [ \
            #Note -N is also in blastpgp, but not blastall
            _Option(["-N", "nbits_gapping"], ["input"], None, 0, 
@@ -330,12 +343,16 @@ class RpsBlastCommandline(_BlastCommandLine):
         ] 
         _BlastCommandLine.__init__(self, cmd, **kwargs)
 
-   
-class _NcbiblastCommandline(AbstractCommandline):
-    """Base Commandline object for (classic) NCBI BLAST wrappers (PRIVATE).
+##############################################################################
+# Legacy BLAST wrappers above, (new) BLAST+ wrappers below
+##############################################################################
+
+class _NcbibaseblastCommandline(AbstractCommandline):
+    """Base Commandline object for (new) NCBI BLAST+ wrappers (PRIVATE).
 
     This is provided for subclassing, it deals with shared options
-    common to all the BLAST tools (blastn, rpsblast, rpsblast, etc).
+    common to all the BLAST tools (blastn, rpsblast, rpsblast, etc
+    AND blast_formatter).
     """
     def __init__(self, cmd=None, **kwargs):
         assert cmd is not None
@@ -347,28 +364,13 @@ class _NcbiblastCommandline(AbstractCommandline):
                     "Print USAGE, DESCRIPTION and ARGUMENTS description;  ignore other arguments."),
             _Switch(["-version", "version"], ["input"],
                     "Print version number;  ignore other arguments."),
-            #Input query options:
-            _Option(["-query", "query"], ["input", "file"], None, 0,
-                    "The sequence to search with.", False), #Should this be required?
-            _Option(["-query_loc", "query_loc"], ["input"], None, 0,
-                    "Location on the query sequence (Format: start-stop)", False),
-            #General search options:
-            _Option(["-db", "db"], ["input"], None, 0,
-                    "The database to BLAST against.", False), #Should this be required?
+            # Output configuration options
             _Option(["-out", "out"], ["output", "file"], None, 0,
                     "Output file for alignment.", False),
-            _Option(["-evalue", "evalue"], ["input"], None, 0, 
-                    "Expectation value cutoff.", False),
-            _Option(["-word_size","word_size"], ["input"], None, 0,
-                    """Word size for wordfinder algorithm.
-
-                    Integer. Minimum 2.""", False),
-            #BLAST-2-Sequences options:
-            # - see subclass
             #Formatting options:
             _Option(["-outfmt", "outfmt"], ["input"], None, 0, 
-                    "Alignment view.  Integer 0-10.  Use 5 for XML output (differs from classic BLAST which used 7 for XML).",
-                    False), #Did not include old aliases as meaning has changed!
+                    "Alignment view.  Integer 0-11.  Use 5 for XML output (differs from classic BLAST which used 7 for XML).",
+                    False), #TODO - Document and test the column options
             _Switch(["-show_gis","show_gis"], ["input"],
                     "Show NCBI GIs in deflines?"),
             _Option(["-num_descriptions","num_descriptions"], ["input"], None, 0,
@@ -383,6 +385,56 @@ class _NcbiblastCommandline(AbstractCommandline):
                     See also num_alignments.""", False),
             _Switch(["-html", "html"], ["input"],
                     "Produce HTML output? See also the outfmt option."),
+            #Miscellaneous options
+            _Switch(["-parse_deflines", "parse_deflines"], ["input"],
+                    "Should the query and subject defline(s) be parsed?"),
+            ]
+        try:
+            #Insert extra parameters - at the start just in case there
+            #are any arguments which must come last:
+            self.parameters = extra_parameters + self.parameters
+        except AttributeError:
+            #Should we raise an error?  The subclass should have set this up!
+            self.parameters = extra_parameters
+        AbstractCommandline.__init__(self, cmd, **kwargs)
+
+    def _validate_incompatibilities(self, incompatibles):
+        """Used by the BLAST+ _validate method (PRIVATE)."""
+        for a in incompatibles:
+            if self._get_parameter(a):
+                for b in incompatibles[a]:
+                    if self._get_parameter(b):
+                        raise ValueError("Options %s and %s are incompatible." \
+                                         % (a,b))
+
+        
+class _NcbiblastCommandline(_NcbibaseblastCommandline):
+    """Base Commandline object for (new) NCBI BLAST+ wrappers (PRIVATE).
+
+    This is provided for subclassing, it deals with shared options
+    common to all the BLAST tools (blastn, rpsblast, rpsblast, etc).
+    """
+    def __init__(self, cmd=None, **kwargs):
+        assert cmd is not None
+        extra_parameters = [ \
+            #Input query options:
+            _Option(["-query", "query"], ["input", "file"], None, 0,
+                    "The sequence to search with.", False), #Should this be required?
+            _Option(["-query_loc", "query_loc"], ["input"], None, 0,
+                    "Location on the query sequence (Format: start-stop)", False),
+            #General search options:
+            _Option(["-db", "db"], ["input"], None, 0,
+                    "The database to BLAST against.", False), #Should this be required?
+            _Option(["-evalue", "evalue"], ["input"], None, 0, 
+                    "Expectation value cutoff.", False),
+            _Option(["-word_size","word_size"], ["input"], None, 0,
+                    """Word size for wordfinder algorithm.
+
+                    Integer. Minimum 2.""", False),
+            #BLAST-2-Sequences options:
+            # - see subclass
+            #Formatting options:
+            # - see baseclass
             #Query filtering options
             # TODO -soft_masking <Boolean>, is this a switch or an option?
             #_Switch(["-soft_masking", "soft_masking"], ["input"],
@@ -393,12 +445,17 @@ class _NcbiblastCommandline(AbstractCommandline):
             _Option(["-gilist", "gilist"], ["input", "file"], None, 0,
                     """Restrict search of database to list of GI's.
  
-                    Incompatible with: negative_gilist, remote, subject, subject_loc""",
+                    Incompatible with: negative_gilist, seqidlist, remote, subject, subject_loc""",
                     False),
             _Option(["-negative_gilist", "negative_gilist"], ["input", "file"], None, 0,
                     """Restrict search of database to everything except the listed GIs.
  
-                    Incompatible with: gilist, remote, subject, subject_loc""",
+                    Incompatible with: gilist, seqidlist, remote, subject, subject_loc""",
+                    False),
+            _Option(["-seqidlist", "seqidlist"], ["input", "file"], None, 0,
+                    """Restrict search of database to list of SeqID's.
+ 
+                    Incompatible with: gilist, negative_gilist, remote, subject, subject_loc""",
                     False),
             _Option(["-entrez_query", "entrez_query"], ["input"], None, 0,
                     "Restrict search with the given Entrez query (requires remote).", False),
@@ -436,8 +493,6 @@ class _NcbiblastCommandline(AbstractCommandline):
 
                     Incompatible with: import_search_strategy""", False),
             #Miscellaneous options
-            _Switch(["-parse_deflines", "parse_deflines"], ["input"],
-                    "Should the query and subject defline(s) be parsed?"),
             _Option(["-num_threads", "num_threads"], ["input"], None, 0,
                     """Number of threads to use in the BLAST search.
 
@@ -455,27 +510,21 @@ class _NcbiblastCommandline(AbstractCommandline):
         except AttributeError:
             #Should we raise an error?  The subclass should have set this up!
             self.parameters = extra_parameters
-        AbstractCommandline.__init__(self, cmd, **kwargs)
+        _NcbibaseblastCommandline.__init__(self, cmd, **kwargs)
 
     def _validate(self):
         incompatibles = {"remote":["gilist", "negative_gilist", "num_threads"],
                          "import_search_strategy" : ["export_search_strategy"],
-                         "gilist":["negative_gilist"]}
+                         "gilist":["negative_gilist"],
+                         "seqidlist":["gilist", "negative_gilist", "remote"]}
         self._validate_incompatibilities(incompatibles)
         if self.entrez_query and not self.remote :
             raise ValueError("Option entrez_query requires remote option.")
         AbstractCommandline._validate(self)
 
-    def _validate_incompatibilities(self, incompatibles):
-        for a in incompatibles:
-            if self._get_parameter(a):
-                for b in incompatibles[a]:
-                    if self._get_parameter(b):
-                        raise ValueError("Options %s and %s are incompatible." \
-                                         % (a,b))
 
 class _Ncbiblast2SeqCommandline(_NcbiblastCommandline):
-    """Base Commandline object for (classic) NCBI BLAST wrappers (PRIVATE).
+    """Base Commandline object for (new) NCBI BLAST+ wrappers (PRIVATE).
 
     This is provided for subclassing, it deals with shared options
     common to all the BLAST tools supporting two-sequence BLAST
@@ -531,11 +580,12 @@ class _Ncbiblast2SeqCommandline(_NcbiblastCommandline):
 
 
     def _validate(self):
-        incompatibles = {"subject_loc":["db, gilist, negative_gilist, remote"],
+        incompatibles = {"subject_loc":["db", "gilist", "negative_gilist", "seqidlist", "remote"],
                          "culling_limit":["best_hit_overhang","best_hit_score_edge"],
-                         "subject":["db", "gilist", "negative_gilist"]}
+                         "subject":["db", "gilist", "negative_gilist", "seqidlist"]}
         self._validate_incompatibilities(incompatibles)
         _NcbiblastCommandline._validate(self)
+
 
 class NcbiblastpCommandline(_Ncbiblast2SeqCommandline):
     """Create a commandline for the NCBI BLAST+ program blastp (for proteins).
@@ -552,8 +602,8 @@ class NcbiblastpCommandline(_Ncbiblast2SeqCommandline):
     >>> print cline
     blastp -query rosemary.pro -db nr -evalue 0.001 -remote -ungapped
 
-    You would typically run the command line with the Python subprocess module,
-    as described in the Biopython tutorial.
+    You would typically run the command line with cline() or via the Python
+    subprocess module, as described in the Biopython tutorial.
     """
     def __init__(self, cmd="blastp", **kwargs):
         self.parameters = [ \
@@ -617,12 +667,12 @@ class NcbiblastnCommandline(_Ncbiblast2SeqCommandline):
     >>> cline = NcbiblastnCommandline(query="m_cold.fasta", db="nt", strand="plus",
     ...                               evalue=0.001, out="m_cold.xml", outfmt=5)
     >>> cline
-    NcbiblastnCommandline(cmd='blastn', query='m_cold.fasta', db='nt', out='m_cold.xml', evalue=0.001, outfmt=5, strand='plus')
+    NcbiblastnCommandline(cmd='blastn', out='m_cold.xml', outfmt=5, query='m_cold.fasta', db='nt', evalue=0.001, strand='plus')
     >>> print cline
-    blastn -query m_cold.fasta -db nt -out m_cold.xml -evalue 0.001 -outfmt 5 -strand plus
+    blastn -out m_cold.xml -outfmt 5 -query m_cold.fasta -db nt -evalue 0.001 -strand plus
 
-    You would typically run the command line with the Python subprocess module,
-    as described in the Biopython tutorial.
+    You would typically run the command line with cline() or via the Python
+    subprocess module, as described in the Biopython tutorial.
     """
     def __init__(self, cmd="blastn", **kwargs):
         self.parameters = [ \
@@ -692,6 +742,13 @@ class NcbiblastnCommandline(_Ncbiblast2SeqCommandline):
                     "Minimum raw gapped score to keep an alignment in the preliminary gapped and traceback stages (integer).", False),
             _Switch(["-ungapped", "ungapped"], ["input"],
                     "Perform ungapped alignment only?"),
+            _Option(["-off_diagonal_range", "off_diagonal_range"], ["input"], None, 0,
+                    """Number of off-diagonals to search for the 2nd hit (integer).
+                    
+                    Expects a positive integer, or 0 (default) to turn off.
+                    
+                    Added in BLAST 2.2.23+
+                    """, False),
             ]
         _Ncbiblast2SeqCommandline.__init__(self, cmd, **kwargs)
 
@@ -718,8 +775,8 @@ class NcbiblastxCommandline(_Ncbiblast2SeqCommandline):
     >>> print cline
     blastx -query m_cold.fasta -db nr -evalue 0.001
 
-    You would typically run the command line with the Python subprocess module,
-    as described in the Biopython tutorial.
+    You would typically run the command line with cline() or via the Python
+    subprocess module, as described in the Biopython tutorial.
     """
     def __init__(self, cmd="blastx", **kwargs):
         self.parameters = [ \
@@ -786,8 +843,8 @@ class NcbitblastnCommandline(_Ncbiblast2SeqCommandline):
     >>> print cline
     tblastn -help
 
-    You would typically run the command line with the Python subprocess module,
-    as described in the Biopython tutorial.
+    You would typically run the command line with cline() or via the Python
+    subprocess module, as described in the Biopython tutorial.
     """
     def __init__(self, cmd="tblastn", **kwargs):
         self.parameters = [ \
@@ -826,6 +883,12 @@ class NcbitblastnCommandline(_Ncbiblast2SeqCommandline):
 
                     Format: "yes", "window locut hicut", or "no" to disable.
                     Default is "12 2.2 2.5""", False),
+            #Restrict search or results:
+            _Option(["-db_soft_mask", "db_soft_mask"], ["input"], None, 0,
+                    """Filtering algorithm ID to apply to the BLAST database as soft masking (string).
+                    
+                    Incompatible with: subject, subject_loc
+                    """, False),
             #Extension options:
             _Switch(["-ungapped", "ungapped"], ["input"],
                     "Perform ungapped alignment only?"),
@@ -860,8 +923,8 @@ class NcbitblastxCommandline(_Ncbiblast2SeqCommandline):
     >>> print cline
     tblastx -help
 
-    You would typically run the command line with the Python subprocess module,
-    as described in the Biopython tutorial.
+    You would typically run the command line with cline() or via the Python
+    subprocess module, as described in the Biopython tutorial.
     """
     def __init__(self, cmd="tblastx", **kwargs):
         self.parameters = [ \
@@ -897,6 +960,12 @@ class NcbitblastxCommandline(_Ncbiblast2SeqCommandline):
 
                     Format: "yes", "window locut hicut", or "no" to disable.
                     Default is "12 2.2 2.5""", False),
+            #Restrict search or results:
+            _Option(["-db_soft_mask", "db_soft_mask"], ["input"], None, 0,
+                    """Filtering algorithm ID to apply to the BLAST database as soft masking (string).
+                    
+                    Incompatible with: subject, subject_loc
+                    """, False),
            ]
         _Ncbiblast2SeqCommandline.__init__(self, cmd, **kwargs)
 
@@ -915,8 +984,8 @@ class NcbipsiblastCommandline(_Ncbiblast2SeqCommandline):
     >>> print cline
     psiblast -help
 
-    You would typically run the command line with the Python subprocess module,
-    as described in the Biopython tutorial.
+    You would typically run the command line with cline() or via the Python
+    subprocess module, as described in the Biopython tutorial.
     """
     def __init__(self, cmd="psiblast", **kwargs):
         self.parameters = [ \
@@ -1003,8 +1072,8 @@ class NcbirpsblastCommandline(_NcbiblastCommandline):
     >>> print cline
     rpsblast -help
 
-    You would typically run the command line with the Python subprocess module,
-    as described in the Biopython tutorial.
+    You would typically run the command line with cline() or via the Python
+    subprocess module, as described in the Biopython tutorial.
     """
     def __init__(self, cmd="rpsblast", **kwargs):
         self.parameters = [ \
@@ -1032,8 +1101,8 @@ class NcbirpstblastnCommandline(_NcbiblastCommandline):
     >>> print cline
     rpstblastn -help
 
-    You would typically run the command line with the Python subprocess module,
-    as described in the Biopython tutorial.
+    You would typically run the command line with cline() or via the Python
+    subprocess module, as described in the Biopython tutorial.
     """
     def __init__(self, cmd="rpstblastn", **kwargs):
         self.parameters = [ \
@@ -1060,6 +1129,52 @@ class NcbirpstblastnCommandline(_NcbiblastCommandline):
             ]
         _NcbiblastCommandline.__init__(self, cmd, **kwargs)
 
+
+class NcbiblastformatterCommandline(_NcbibaseblastCommandline):
+    """Wrapper for the NCBI BLAST+ program blast_formatter.
+
+    With the release of BLAST 2.2.24+ (i.e. the BLAST suite rewritten in C++
+    instead of C), the NCBI added the ASN.1 output format option to all the
+    search tools, and extended the blast_formatter to support this as input.
+
+    The blast_formatter command allows you to convert the ASN.1 output into
+    the other output formats (XML, tabular, plain text, HTML).
+    
+    >>> from Bio.Blast.Applications import NcbiblastformatterCommandline
+    >>> cline = NcbiblastformatterCommandline(archive="example.asn", outfmt=5, out="example.xml")
+    >>> cline
+    NcbiblastformatterCommandline(cmd='blast_formatter', out='example.xml', outfmt=5, archive='example.asn')
+    >>> print cline
+    blast_formatter -out example.xml -outfmt 5 -archive example.asn
+
+    You would typically run the command line with cline() or via the Python
+    subprocess module, as described in the Biopython tutorial.
+
+    Note that this wrapper is for the version of blast_formatter from BLAST
+    2.2.24+ (or later) which is when the NCBI first announced the inclusion
+    this tool. There was actually an early version in BLAST 2.2.23+ (and
+    possibly in older releases) but this did not have the -archive option
+    (instead -rid is a mandatory argument), and is not supported by this
+    wrapper.
+    """
+    def __init__(self, cmd="blast_formatter", **kwargs):
+        self.parameters = [ \
+            # Input options
+            _Option(["-rid", "rid"], ["input"], None, False,
+                    "BLAST Request ID (RID), not compatiable with archive arg", False),
+            _Option(["-archive", "archive"], ["input", "file"], None, False,
+                    "Archive file of results, not compatiable with rid arg.", False),
+            # Restrict search or results
+            _Option(["-max_target_seqs", "max_target_seqs"], ["input"], lambda value: value >= 1, False,
+                    """Maximum number of aligned sequences to keep""", True),
+            ]
+        _NcbibaseblastCommandline.__init__(self, cmd, **kwargs)
+
+    def _validate(self):
+        incompatibles = {"rid":["archive"]}
+        self._validate_incompatibilities(incompatibles)
+        _NcbibaseblastCommandline._validate(self)
+        
 
 def _test():
     """Run the Bio.Blast.Applications module's doctests."""

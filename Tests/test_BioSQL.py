@@ -152,10 +152,42 @@ class ReadTest(unittest.TestCase):
         del self.db
         del self.server
 
+    def test_server(self):
+        """Check BioSeqDatabase methods"""
+        server = self.server
+        self.assertTrue("biosql-test" in server)
+        self.assertEqual(1, len(server))
+        self.assertEqual(["biosql-test"], server.keys())
+        #Check we can delete the namespace...
+        del server["biosql-test"]
+        self.assertEqual(0, len(server))
+        try:
+            del server["non-existant-name"]
+            assert False, "Should have raised KeyError"
+        except KeyError:
+            pass
+
     def test_get_db_items(self):
-        """Get a list of all items in the database.
-        """
-        items = self.db.values()
+        """Check list, keys, length etc"""
+        db = self.db
+        items = db.values()
+        keys = db.keys()
+        l = len(items)
+        self.assertEqual(l, len(db))
+        self.assertEqual(l, len(list(db.iteritems())))
+        self.assertEqual(l, len(list(db.iterkeys())))
+        self.assertEqual(l, len(list(db.itervalues())))
+        for (k1,r1), (k2,r2) in zip(zip(keys, items), db.iteritems()):
+            self.assertEqual(k1, k2)
+            self.assertEqual(r1.id, r2.id)
+        for k in keys:
+            del db[k]
+        self.assertEqual(0, len(db))
+        try:
+            del db["non-existant-name"]
+            assert False, "Should have raised KeyError"
+        except KeyError:
+            pass
 
     def test_lookup_items(self):
         """Test retrieval of items using various ids.
@@ -343,6 +375,7 @@ class LoaderTest(unittest.TestCase):
         # thing. More advanced tests in a different module.
         items = self.db.values()
         self.assertEqual(len(items), 6)
+        self.assertEqual(len(self.db), 6)
         item_names = []
         item_ids = []
         for item in items:
@@ -475,9 +508,6 @@ class ClosedLoopTest(unittest.TestCase):
             for key in ["comment", "references", "db_source"]:
                 if key in old.annotations and key not in new.annotations:
                     del old.annotations[key]
-            #TODO - remove this hack one we write the date properly:
-            del old.annotations["date"]
-            del new.annotations["date"]
             self.assertTrue(compare_record(old, new))
         #Done
         server.close()

@@ -10,6 +10,8 @@ You are expected to use this module via the Bio.AlignIO functions (or the
 Bio.SeqIO functions if you want to work directly with the gapped sequences).
 """
 
+from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
 from Bio.Align import MultipleSeqAlignment
 from Interfaces import AlignmentIterator, SequentialAlignmentWriter
 
@@ -61,7 +63,7 @@ class ClustalWriter(SequentialAlignmentWriter):
                 #identifier when output in the file by replacing
                 #them with underscores:
                 line = record.id[0:30].replace(" ","_").ljust(36)
-                line += record.seq.data[cur_char:(cur_char + show_num)]
+                line += record.seq[cur_char:(cur_char + show_num)].tostring()
                 output += line + "\n"
 
             # now we need to print out the star info, if we've got it
@@ -89,7 +91,7 @@ class ClustalIterator(AlignmentIterator):
         except AttributeError:      
             line = handle.readline()
         if not line:
-            return None
+            raise StopIteration
 
         #Whitelisted headers we know about
         known_headers = ['CLUSTAL', 'PROBCONS', 'MUSCLE']
@@ -243,24 +245,22 @@ class ClustalIterator(AlignmentIterator):
 
         assert len(ids) == len(seqs)
         if len(seqs) == 0 or len(seqs[0]) == 0:
-            return None
+            raise StopIteration
 
         if self.records_per_alignment is not None \
         and self.records_per_alignment != len(ids):
             raise ValueError("Found %i records in this alignment, told to expect %i" \
                              % (len(ids), self.records_per_alignment))
 
-        alignment = MultipleSeqAlignment(self.alphabet)
-        alignment_length = len(seqs[0])
-        for i in range(len(ids)):
-            if len(seqs[i]) != alignment_length:
-                raise ValueError("Error parsing alignment - sequences of different length?")
-            alignment.add_sequence(ids[i], seqs[i])
+        records = (SeqRecord(Seq(s, self.alphabet), id=i, description=i) \
+                   for (i,s) in zip(ids, seqs)) 
+        alignment = MultipleSeqAlignment(records, self.alphabet)
         #TODO - Handle alignment annotation better, for now
         #mimic the old parser in Bio.Clustalw
         if version:
             alignment._version = version
         if consensus:
+            alignment_length = len(seqs[0])
             assert len(consensus) == alignment_length, \
                    "Alignment length is %i, consensus length is %i, '%s'" \
                    % (alignment_length, len(consensus), consensus)

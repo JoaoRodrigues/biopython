@@ -95,8 +95,6 @@ localds(sequenceA, sequenceB, match_dict, open, extend) -> alignments
 # - one_alignment_only: boolean
 #   Only recover one alignment.
 
-from types import *
-
 MAX_ALIGNMENTS = 1000   # maximum alignments recovered in traceback
 
 class align:
@@ -260,11 +258,8 @@ def _align(sequenceA, sequenceB, match_fn, gap_A_fn, gap_B_fn,
     if not sequenceA or not sequenceB:
         return []
 
-    if (not force_generic) and \
-       type(gap_A_fn) is InstanceType and \
-       gap_A_fn.__class__ is affine_penalty and \
-       type(gap_B_fn) is InstanceType and \
-       gap_B_fn.__class__ is affine_penalty:
+    if (not force_generic) and isinstance(gap_A_fn, affine_penalty) \
+    and isinstance(gap_B_fn, affine_penalty):
         open_A, extend_A = gap_A_fn.open, gap_A_fn.extend
         open_B, extend_B = gap_B_fn.open, gap_B_fn.extend
         x = _make_score_matrix_fast(
@@ -778,10 +773,9 @@ def print_matrix(matrix):
             matrixT[j].append(len(str(matrix[i][j])))
     ndigits = map(max, matrixT)
     for i in range(len(matrix)):
-        for j in range(len(matrix[i])):
-            n = ndigits[j]
-            print "%*s " % (n, matrix[i][j]),
-        print
+        #Using string formatting trick to add leading spaces,
+        print " ".join("%*s " % (ndigits[j], matrix[i][j]) \
+                       for j in range(len(matrix[i])))
 
 def format_alignment(align1, align2, score, begin, end):
     """format_alignment(align1, align2, score, begin, end) -> string
@@ -800,13 +794,6 @@ def format_alignment(align1, align2, score, begin, end):
 # Try and load C implementations of functions.  If I can't,
 # then just ignore and use the pure python implementations.
 try:
-    import cpairwise2
+    from cpairwise2 import rint, _make_score_matrix_fast
 except ImportError:
     pass
-else:
-    import sys
-    this_module = sys.modules[__name__]
-    for name in cpairwise2.__dict__.keys():
-        if not name.startswith("__"):
-            this_module.__dict__[name] = cpairwise2.__dict__[name]
-

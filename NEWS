@@ -3,13 +3,108 @@ News for the Biopython Project
 
 This file contains release notes and general news about the Biopython
 project.  See also the DEPRECATED file which tracks the removal of
-obsolete modules or functions, and http://biopython.org/wiki/News online.
+obsolete modules or functions, and online http://biopython.org/wiki/News
+and http://news.open-bio.org/news/category/obf-projects/biopython/
 
-The latest news is at the top.
+The latest news is at the top of this file.
 
 ===================================================================
 
-In progress: Biopython 1.55 (not yet released).
+In progress: Biopython 1.57 (not yet released).
+
+Bio.Blast.Applications now includes a wrapper for the BLAST+ blast_formatter
+tool from NCBI BLAST 2.2.24+ or later. This release of BLAST+ added the
+ability to run the BLAST tools and save the output as ASN.1 format, and then
+convert this to any other supported BLAST ouput format (plain text, tabular,
+XML, or HTML) with the blast_formatter tool.
+
+===================================================================
+
+26 November 2010: Biopython 1.56 released.
+
+This is planned to be our last release to support Python 2.4, however this
+could be delayed given immediate feedback from our users (e.g. if this proves
+to be a problem in combination with other libraries or a popular Linux
+distribution).
+
+Bio.SeqIO can now read and index UniProt XML files (under format name
+"uniprot-xml", which was agreed with EMBOSS and BioPerl for when/if they
+support it too).
+
+Bio.SeqIO can now read, write and index IMGT files. These are a variant of
+the EMBL sequence text file format with longer feature indentation.
+
+Bio.SeqIO now supports protein EMBL files (used in the EMBL patents database
+file epo_prt.dat) - perviously we only expected nucleotide EMBL files.
+
+The Bio.Seq translation methods and function will now accept an arbitrary
+CodonTable object (for those of you working on very unusual organisms).
+
+The SeqFeature object now supports len(feature) giving the length consistent
+with the existing extract method. Also, it now supports iteration giving the
+coordindate (with respect to the parent sequence) of each letter within the
+feature (in frame aware order), and "in" which allows you to check if a
+(parent based) coordindate is within the feature location.
+
+Bio.Entrez will now try to download any missing NCBI DTD files and cache them
+in the user's home directory.
+
+The provisional database schema for BioSQL support on SQLite which Biopython
+has been using since Release 1.53 has now been added to BioSQL, and updated
+slightly.
+
+Bio.PopGen.FDist now supports the DFDist command line tool as well as FDist2.
+
+Bio.Motif now has a chapter in the Tutorial.
+
+(At least) 13 people have contributed to this release, include 6 new people:
+
+Andrea Pierleoni (first contribution)
+Bart de Koning (first contribution)
+Bartek Wilczynski
+Bartosz Telenczuk (first contribution)
+Cymon Cox
+Eric Talevich
+Frank Kauff
+Michiel de Hoon
+Peter Cock
+Phillip Garland (first contribution)
+Siong Kong (first contribution)
+Tiago Antao
+Uri Laserson (first contribution)
+
+===================================================================
+
+31 August 2010: Biopython 1.55 released.
+
+See the notes below for the Biopython 1.55 beta release for changes since
+Biopython 1.54 was released. Since the beta release we have marked a few
+modules as obsolete or deprecated, and removed some deprecated code. There
+have also been a few bug fixes, extra unit tests, and documentation
+improvements.
+
+(At least) 12 people have contributed to this release, including 6 new people:
+
+Andres Colubri (first contribution)
+Carlos Rios Vera (first contribution)
+Claude Paroz (first contribution)
+Cymon Cox
+Eric Talevich
+Frank Kauff
+Joao Rodrigues (first contribution)
+Konstantin Okonechnikov (first contribution)
+Michiel de Hoon
+Nathan Edwards (first contribution)
+Peter Cock
+Tiago Antao
+
+===================================================================
+
+18 August 2010: Biopython 1.55 beta released.
+
+This is a beta release for testing purposes, both for new features added,
+and more importantly updates to avoid code deprecated in Python 2.7 or in
+Python 3. This is an important step towards Python 3 support.
 
 We are phasing out support for Python 2.4. We will continue to support it
 for at least one further release (Biopython 1.56). This could be delayed
@@ -26,13 +121,25 @@ handling of model numbers, and files missing the element column.
 Feature location parsing for GenBank and EMBL files has been rewritten,
 making the parser much faster.
 
-We have also been working on updates to avoid code which has been deprecated
-in Python 2.7 or Python 3, an important step towards Python 3 support.
+Ace parsing by SeqIO now uses zero rather than None for the quality score of
+any gaps (insertions) in the contig sequence.
 
-(At least) 7 people have contributed to this release, including 3 new people:
+The BioSQL classes DBServer and BioSeqDatabase now act more like Python
+dictionaries, making it easier to count, delete, iterate over, or check for
+membership of namespaces and records.
 
+The command line tool application wrapper classes are now executable, so you
+can use them to call the tool (using the subprocess module internally) and
+capture the output and any error messages as strings (stdout and stderr).
+This avoids having to worry about the details of how best to use subprocess.
+
+(At least) 10 people have contributed to this release, including 5 new people:
+
+Andres Colubri (first contribution)
 Carlos Rios Vera (first contribution)
+Claude Paroz (first contribution)
 Eric Talevich
+Frank Kauff
 Joao Rodrigues (first contribution)
 Konstantin Okonechnikov (first contribution)
 Michiel de Hoon

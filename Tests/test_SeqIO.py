@@ -25,7 +25,6 @@ def send_warnings_to_stdout(message, category, filename, lineno,
     #TODO - Have Biopython DataLossWarning?
     if category in [UserWarning]:
         print "%s - %s" % (category.__name__, message)
-warnings.resetwarnings()
 warnings.showwarning = send_warnings_to_stdout
 
 
@@ -36,7 +35,7 @@ nucleotide_alphas = [Alphabet.generic_nucleotide,
                      Alphabet.Gapped(Alphabet.generic_nucleotide)]
 no_alpha_formats = ["fasta","clustal","phylip","tab","ig","stockholm","emboss",
                     "fastq","fastq-solexa","fastq-illumina","qual"]
-possible_unknown_seq_formats = ["qual", "genbank", "gb", "embl"]
+possible_unknown_seq_formats = ["qual", "genbank", "gb", "embl", "imgt"]
 
 #List of formats including alignment only file formats we can read AND write.
 #The list is initially hard coded to preserve the original order of the unit
@@ -77,7 +76,7 @@ test_files = [ \
     ("fasta",  False, 'Fasta/loveliesbleeding.pro', 1),
     ("fasta",  False, 'Fasta/rose.pro', 1),
     ("fasta",  False, 'Fasta/rosemary.pro', 1),
-#Following examples are also used in test_Fasta.py
+#Following examples are also used in test_BioSQL_SeqIO.py
     ("fasta",  False, 'Fasta/f001', 1), #Protein
     ("fasta",  False, 'Fasta/f002', 3), #DNA
     #("fasta", False, 'Fasta/f003', 2), #Protein with comments
@@ -115,6 +114,11 @@ test_files = [ \
     ("swiss",  False, 'SwissProt/sp016', 1),
 #Following example is also used in test_registry.py
     ("swiss",  False, 'Registry/EDD_RAT.dat', 1),
+#Following examples are also used in test_Uniprot.py
+    ("uniprot-xml",  False, 'SwissProt/uni001', 1),
+    ("uniprot-xml",  False, 'SwissProt/uni002', 3),
+    ("uniprot-xml",  False, 'SwissProt/Q13639.xml', 1),
+    ("swiss",    False, 'SwissProt/Q13639.txt', 1),
 #Following examples are also used in test_GenBank.py
     ("genbank",False, 'GenBank/noref.gb', 1),
     ("genbank",False, 'GenBank/cor6_6.gb', 6),
@@ -138,7 +142,8 @@ test_files = [ \
     ("genbank",False, 'GenBank/gbvrl1_start.seq', 3),
 #Following files are also used in test_GFF.py
     ("genbank",False, 'GFF/NC_001422.gbk', 1),
-#Following files are currently only used here:
+#Following files are currently only used here or in test_SeqIO_index.py:
+    ("embl",   False, 'EMBL/epo_prt_selection.embl', 9), #proteins
     ("embl",   False, 'EMBL/TRBG361.embl', 1),
     ("embl",   False, 'EMBL/DD231055_edited.embl', 1),
     ("embl",   False, 'EMBL/SC10H5.embl', 1), # Pre 2006 style ID line
@@ -147,6 +152,7 @@ test_files = [ \
     ("embl",   False, 'EMBL/AE017046.embl', 1), #See also NC_005816.gb
     ("embl",   False, 'EMBL/Human_contigs.embl', 2), #contigs, no sequences
     ("embl",   False, 'EMBL/A04195.imgt', 1), # features over indented for EMBL
+    ("imgt",   False, 'EMBL/A04195.imgt', 1), # features over indented for EMBL
     ("stockholm", True,  'Stockholm/simple.sth', 2),
     ("stockholm", True,  'Stockholm/funny.sth', 5),
 #Following PHYLIP files are currently only used here and in test_AlignIO.py,
@@ -365,7 +371,7 @@ def check_simple_write_read(records, indent=" "):
             assert len(r1) == len(r2)
 
             #Check the sequence
-            if format in ["gb", "genbank", "embl"]:
+            if format in ["gb", "genbank", "embl", "imgt"]:
                 #The GenBank/EMBL parsers will convert to upper case.
                 if isinstance(r1.seq, UnknownSeq) \
                 and isinstance(r2.seq, UnknownSeq):
@@ -408,7 +414,7 @@ def check_simple_write_read(records, indent=" "):
 
 #Check parsers can cope with an empty file
 for t_format in SeqIO._FormatToIterator:
-    if t_format in SeqIO._BinaryFormats:
+    if t_format in SeqIO._BinaryFormats or t_format=="uniprot-xml":
         #Not allowed empty SFF files.
         continue
     handle = StringIO()
@@ -442,15 +448,10 @@ for (t_format, t_alignment, t_filename, t_count) in test_files:
         try:
             record = seq_iterator.next()
         except StopIteration:
-            record = None
-        #Note that if the SeqRecord class has a __len__ method,
-        #and it has a zero-length sequence, this would fail an
-        #"if record" test.
-        if record is not None:
-            records3.append(record)
-        else:
             break
-
+        assert record is not None, "Should raise StopIteration not return None"
+        records3.append(record)
+        
     #Try a mixture of next() and list (a torture test!)
     seq_iterator = SeqIO.parse(handle=open(t_filename,mode), format=t_format)
     try:

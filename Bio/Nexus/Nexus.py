@@ -109,14 +109,16 @@ class CharBuffer:
             return None
         word.append(first)
         if first=="'":                                      # word starts with a quote
-            quoted=True
+            quoted="'"
+        elif first=='"':
+            quoted='"'
         elif first in PUNCTUATION:                          # if it's punctuation, return immediately
             return first
         while True:             
             c=self.peek()
-            if c=="'":                                      # a quote?
+            if c==quoted:                                      # a quote?
                 word.append(self.next())                    # store quote 
-                if self.peek()=="'":                        # double quote
+                if self.peek()==quoted:                        # double quote
                     skip=self.next()                        # skip second quote 
                 elif quoted:                                # second single quote ends word
                     break
@@ -322,10 +324,10 @@ def combine(matrices):
     combined.translate=None
 
     # rename taxon sets and character sets and name them with prefix
-    for cn,cs in combined.charsets.items():
+    for cn,cs in combined.charsets.iteritems():
         combined.charsets['%s.%s' % (name,cn)]=cs
         del combined.charsets[cn]
-    for tn,ts in combined.taxsets.items():
+    for tn,ts in combined.taxsets.iteritems():
         combined.taxsets['%s.%s' % (name,tn)]=ts
         del combined.taxsets[tn]
     # previous partitions usually don't make much sense in combined matrix
@@ -345,18 +347,22 @@ def combine(matrices):
             combined.matrix[t]=Seq(combined.missing*combined.nchar,combined.alphabet)+\
                 Seq(m.matrix[t].tostring().replace(m.gap,combined.gap).replace(m.missing,combined.missing),combined.alphabet)
         combined.taxlabels.extend(m_only)    # new taxon list
-        for cn,cs in m.charsets.items():                # adjust character sets for new matrix
+        for cn,cs in m.charsets.iteritems(): # adjust character sets for new matrix
             combined.charsets['%s.%s' % (n,cn)]=[x+combined.nchar for x in cs]
         if m.taxsets:
             if not combined.taxsets:
                 combined.taxsets={}
-            combined.taxsets.update(dict([('%s.%s' % (n,tn),ts) for tn,ts in m.taxsets.items()]))   # update taxon sets
-        combined.charpartitions['combined'][n]=range(combined.nchar,combined.nchar+m.nchar)     # update new charpartition
+            # update taxon sets
+            combined.taxsets.update(dict(('%s.%s' % (n,tn),ts) \
+                                         for tn,ts in m.taxsets.iteritems()))
+        # update new charpartition
+        combined.charpartitions['combined'][n]=range(combined.nchar,combined.nchar+m.nchar)
         # update charlabels
         if m.charlabels:
             if not combined.charlabels:
                 combined.charlabels={}
-            combined.charlabels.update(dict([(combined.nchar+i,label) for (i,label) in m.charlabels.items()]))
+            combined.charlabels.update(dict((combined.nchar+i,label) \
+                                            for (i,label) in m.charlabels.iteritems()))
         combined.nchar+=m.nchar # update nchar and ntax
         combined.ntax+=len(m_only)
         
@@ -381,6 +387,8 @@ def _kill_comments_and_break_lines(text):
    
     NOTE: this function is very slow for large files, and obsolete when using C extension cnexus
     """
+    import warnings
+    warnings.warn("This function is very slow for large files, and obsolete when using C extension cnexus", PendingDeprecationWarning)
     contents=CharBuffer(text)
     newtext=[] 
     newline=[]
@@ -703,14 +711,14 @@ class Nexus(object):
                 #self.unambiguous_letters=self.symbols
             else:
                 raise NexusError('Unsupported datatype: '+self.datatype)
-            self.valid_characters=''.join(self.ambiguous_values.keys())+self.unambiguous_letters
+            self.valid_characters=''.join(self.ambiguous_values)+self.unambiguous_letters
             if not self.respectcase:
                 self.valid_characters=self.valid_characters.lower()+self.valid_characters.upper()
             #we have to sort the reverse ambig coding dict key characters:
             #to be sure that it's 'ACGT':'N' and not 'GTCA':'N'
-            rev=dict([(i[1],i[0]) for i in self.ambiguous_values.items() if i[0]!='X'])
+            rev=dict((i[1],i[0]) for i in self.ambiguous_values.iteritems() if i[0]!='X')
             self.rev_ambiguous_values={}
-            for (k,v) in rev.items():
+            for (k,v) in rev.iteritems():
                 key=[c for c in k]
                 key.sort()
                 self.rev_ambiguous_values[''.join(key)]=v
@@ -872,8 +880,9 @@ class Nexus(object):
             #check for invalid characters
             for i,c in enumerate(iupac_seq.tostring()):
                 if c not in self.valid_characters and c!=self.gap and c!=self.missing:
-                    raise NexusError('Taxon %s: Illegal character %s in line: %s (check dimensions / interleaving)'\
-                            % (id,c,l[i-10:i+10]))
+                    raise NexusError( \
+                        ('Taxon %s: Illegal character %s in sequence %s ' + \
+                         '(check dimensions/interleaving)') % (id,c, iupac_seq))
             #add sequence to matrix
             if first_matrix_block:
                 self.unaltered_taxlabels.append(id)
@@ -894,8 +903,7 @@ class Nexus(object):
                 raise NexusError('Matrx Nchar %d does not match data length (%d) for taxon %s' \
                                  % (self.nchar, len(self.matrix[taxon]),taxon))
         #check that taxlabels is identical with matrix.keys. If not, it's a problem
-        matrixkeys=self.matrix.keys()
-        matrixkeys.sort()
+        matrixkeys=sorted(self.matrix)
         taxlabelssort=self.taxlabels[:]
         taxlabelssort.sort()
         assert matrixkeys==taxlabelssort,"ERROR: TAXLABELS must be identical with MATRIX. Please Report this as a bug, and send in data file."
@@ -926,6 +934,8 @@ class Nexus(object):
         
     def _tree(self,options):
         opts=CharBuffer(options)
+        if opts.peek_nonwhitespace()=='*': # a star can be used to make it the default tree in some software packages
+            dummy=opts.next_nonwhitespace()
         name=opts.next_word()
         if opts.next_nonwhitespace()!='=':
             raise NexusError('Syntax error in tree description: %s' \
@@ -1005,10 +1015,10 @@ class Nexus(object):
         the name CodonPositions and the partitions N,1,2,3
         """
 
-        prev_partitions=self.charpartitions.keys()
+        prev_partitions=self.charpartitions
         self._charpartition(options)
         # mcclade calls it CodonPositions, but you never know...
-        codonname=[n for n in self.charpartitions.keys() if n not in prev_partitions]
+        codonname=[n for n in self.charpartitions if n not in prev_partitions]
         if codonname==[] or len(codonname)>1:
             raise NexusError('Formatting Error in codonposset: %s ' % options)
         else:
@@ -1142,7 +1152,7 @@ class Nexus(object):
             try:
                 n=int(identifier)
             except ValueError:
-                if self.charlabels and identifier in self.charlabels.values():
+                if self.charlabels and identifier in self.charlabels.itervalues():
                     for k in self.charlabels:
                         if self.charlabels[k]==identifier:
                             return k
@@ -1313,8 +1323,7 @@ class Nexus(object):
         #    fh.write('taxlabels '+' '.join(self.taxlabels)+';\n')
         if self.charlabels:
             newcharlabels=self._adjust_charlabels(exclude=exclude)
-            clkeys=newcharlabels.keys()
-            clkeys.sort()
+            clkeys=sorted(newcharlabels)
             fh.write('charlabels '+', '.join(["%s %s" % (k+1,safename(newcharlabels[k])) for k in clkeys])+';\n')
         fh.write('matrix\n')
         if not blocksize:
@@ -1389,15 +1398,15 @@ class Nexus(object):
                 offlist.append(c-offset)
         # now adjust each of the character sets
         if not codons_only:
-            for n,ns in self.charsets.items():
+            for n,ns in self.charsets.iteritems():
                 cset=[offlist[c] for c in ns if c not in exclude]
                 if cset: 
                     setsb.append('charset %s = %s' % (safename(n),_compact4nexus(cset))) 
-            for n,s in self.taxsets.items():
+            for n,s in self.taxsets.iteritems():
                 tset=[safename(t,mrbayes=mrbayes) for t in s if t not in delete]
                 if tset:
                     setsb.append('taxset %s = %s' % (safename(n),' '.join(tset))) 
-        for n,p in self.charpartitions.items():
+        for n,p in self.charpartitions.iteritems():
             if not include_codons and n==CODONPOSITIONS:
                 continue
             elif codons_only and n!=CODONPOSITIONS:
@@ -1419,7 +1428,7 @@ class Nexus(object):
                 setsb.append('%s %s = %s' % (command,safename(n),\
                 ', '.join(['%s: %s' % (sn,_compact4nexus(newpartition[sn])) for sn in names if sn in newpartition])))
         # now write charpartititions, much easier than charpartitions
-        for n,p in self.taxpartitions.items():
+        for n,p in self.taxpartitions.iteritems():
             names=_sort_keys_by_values(p)
             newpartition={}
             for sn in names:
@@ -1606,7 +1615,7 @@ class Nexus(object):
         else:
             unique_name=name
 
-        assert unique_name not in self.matrix.keys(), "ERROR. There is a discrepancy between taxlabels and matrix keys. Report this as a bug."
+        assert unique_name not in self.matrix, "ERROR. There is a discrepancy between taxlabels and matrix keys. Report this as a bug."
 
         self.matrix[unique_name]=Seq(sequence,self.alphabet)
         self.ntax+=1
@@ -1657,10 +1666,10 @@ class Nexus(object):
         self.matrix=dict(listed) 
         self.nchar+=n
         # now adjust character sets
-        for i,s in self.charsets.items():
+        for i,s in self.charsets.iteritems():
             self.charsets[i]=_adjust(s,pos,n,leftgreedy=leftgreedy)
         for p in self.charpartitions:
-            for sp,s in self.charpartitions[p].items():
+            for sp,s in self.charpartitions[p].iteritems():
                 self.charpartitions[p][sp]=_adjust(s,pos,n,leftgreedy=leftgreedy)
         # now adjust character state labels
         self.charlabels=self._adjust_charlabels(insert=[pos]*n)
@@ -1672,8 +1681,7 @@ class Nexus(object):
             raise NexusError('Can\'t exclude and insert at the same time')
         if not self.charlabels:
             return None
-        labels=self.charlabels.keys()
-        labels.sort()
+        labels=sorted(self.charlabels)
         newcharlabels={}
         if exclude:
             exclude.sort()

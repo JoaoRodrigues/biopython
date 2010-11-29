@@ -16,8 +16,9 @@ import itertools
 import random
 import re
 import warnings
+import Bio
 
-import _sugar
+from Bio.Phylo import _sugar
 
 # General tree-traversal algorithms
 
@@ -49,6 +50,7 @@ def _postorder_traverse(root, get_children):
     for elem in dfs(root):
         yield elem
 
+
 def _sorted_attrs(elem):
     """Get a flat list of elem's attributes, sorted for consistency."""
     singles = []
@@ -65,6 +67,7 @@ def _sorted_attrs(elem):
     return (x for x in singles + lists
             if isinstance(x, TreeElement))
 
+
 # Factory functions to generalize searching for clades/nodes
 
 def _identity_matcher(target):
@@ -77,6 +80,11 @@ def _class_matcher(target_cls):
     """Match a node if it's an instance of the given class."""
     def match(node):
         return isinstance(node, target_cls)
+    return match
+
+def _string_matcher(target):
+    def match(node):
+        return unicode(node) == target
     return match
 
 def _attribute_matcher(kwargs):
@@ -146,6 +154,8 @@ def _object_matcher(obj):
         return _identity_matcher(obj)
     if isinstance(obj, type):
         return _class_matcher(obj)
+    if isinstance(obj, basestring):
+        return _string_matcher(obj)
     if isinstance(obj, dict):
         return _attribute_matcher(obj)
     if callable(obj):
@@ -153,7 +163,13 @@ def _object_matcher(obj):
     raise ValueError("%s (type %s) is not a valid type for comparison."
                      % (obj, type(obj)))
 
+
 def _combine_matchers(target, kwargs, require_spec):
+    """Merge target specifications with keyword arguments.
+
+    Dispatch the components to the various matcher functions, then merge into a
+    single boolean function.
+    """
     if not target:
         if not kwargs:
             if require_spec:
@@ -168,6 +184,31 @@ def _combine_matchers(target, kwargs, require_spec):
     return (lambda x: match_obj(x) and match_kwargs(x))
 
 
+def _combine_args(first, *rest):
+    """Convert [targets] or *targets arguments to a single iterable.
+
+    This helps other functions work like the built-in functions `max` and
+    `min`.
+    """
+    # Background: is_monophyletic takes a single list or iterable (like the
+    # same method in Bio.Nexus.Trees); root_with_outgroup and common_ancestor
+    # take separate arguments. This mismatch was in the initial release and I
+    # didn't notice the inconsistency until after Biopython 1.55. I can think
+    # of cases where either style is more convenient, so let's support both
+    # (for backward compatibility and consistency between methods).
+    if hasattr(first, '__iter__') and not (isinstance(first, TreeElement) or
+            isinstance(first, type) or isinstance(first, basestring) or
+            isinstance(first, dict)):
+        # `terminals` is an iterable of targets
+        if rest:
+            raise ValueError("Arguments must be either a single list of "
+                    "targets, or separately specified targets "
+                    "(e.g. foo(t1, t2, t3)), but not both.")
+        return first
+    # `terminals` is a single target -- wrap in a container
+    return itertools.chain([first], rest)
+
+
 # Class definitions
 
 class TreeElement(object):
@@ -179,13 +220,12 @@ class TreeElement(object):
             if isinstance(val, basestring):
                 return "%s='%s'" % (key, _sugar.trim_str(unicode(val)))
             return "%s=%s" % (key, val)
-        s = '%s(%s)' % (self.__class__.__name__,
-                        ', '.join(pair_as_kwarg_string(key, val)
+        return u'%s(%s)' % (self.__class__.__name__,
+                            ', '.join(pair_as_kwarg_string(key, val)
                                   for key, val in self.__dict__.iteritems()
                                   if val is not None and
                                   type(val) in (str, int, float, bool, unicode)
                                   ))
-        return s.encode('utf-8')
 
     __str__ = __repr__
 
@@ -225,7 +265,7 @@ class TreeMixin(object):
         """Return the first element found by find_elements(), or None.
 
         This is also useful for checking whether any matching element exists in
-        the tree.
+        the tree, and can be used in a conditional expression.
         """
         hits = self.find_elements(*args, **kwargs)
         try:
@@ -288,7 +328,10 @@ class TreeMixin(object):
         """Find each clade containing a matching element.
 
         That is, find each element as with find_elements(), but return the
-        corresponding clade object.
+        corresponding clade object. (This is usually what you want.)
+
+        The result is an iterable through all matching objects, searching
+        depth-first (preorder) by default.
         """
         def match_attrs(elem):
             orig_clades = elem.__dict__.pop('clades')
@@ -304,7 +347,7 @@ class TreeMixin(object):
         return self._filter_search(is_matching_elem, order, False)
 
     def get_path(self, target=None, **kwargs):
-        """List the clades directly between the root and the given target.
+        """List the clades directly between this root and the given target.
 
         Returns a list of all clade objects along this path, ending with
         the given target, but excluding the root clade.
@@ -347,7 +390,7 @@ class TreeMixin(object):
 
     # Information methods
 
-    def common_ancestor(self, *targets):
+    def common_ancestor(self, targets, *more_targets):
         """Most recent common ancestor (clade) of all the given targets.
 
         Edge cases: 
@@ -356,7 +399,8 @@ class TreeMixin(object):
             - If 1 target is given, returns the target
             - If any target is not found in this tree, raises a ValueError
         """
-        paths = [self.get_path(t) for t in targets]
+        paths = [self.get_path(t)
+                 for t in _combine_args(targets, *more_targets)]
         # Validation -- otherwise izip throws a spooky error below
         for p, t in zip(paths, targets):
             if p is None:
@@ -379,6 +423,14 @@ class TreeMixin(object):
 
     def depths(self, unit_branch_lengths=False):
         """Create a mapping of tree clades to depths (by branch length).
+
+        The result is a dictionary where the keys are all of the Clade instances
+        in the tree, and the values are the distance from the root to each clade
+        (including terminals).
+        
+        By default the distance is the cumulative branch length leading to the
+        clade. With the unit_branch_lengths=True option, only the number of
+        branches (levels in the tree) is counted.
 
         @return: dict of {clade: depth}
         """
@@ -407,8 +459,13 @@ class TreeMixin(object):
         return mrca.distance(target1) + mrca.distance(target2)
 
     def is_bifurcating(self):
-        """Return True if tree downstream of node is strictly bifurcating."""
-        # Root can be trifurcating, because it has no ancestor
+        """Return True if tree downstream of node is strictly bifurcating.
+        
+        I.e., all nodes have either 2 or 0 children (internal or external,
+        respectively). The root may have 3 descendents and still be considered
+        part of a bifurcating tree, because it has no ancestor.
+        """
+        # Root can be trifurcating
         if isinstance(self, Tree) and len(self.root) == 3:
             return (self.root.clades[0].is_bifurcating() and
                     self.root.clades[1].is_bifurcating() and
@@ -420,12 +477,26 @@ class TreeMixin(object):
             return True
         return False
 
-    def is_monophyletic(self, terminals):
+    def is_monophyletic(self, terminals, *more_terminals):
         """MRCA of terminals if they comprise a complete subclade, or False.
+
+        I.e., there exists a clade such that its terminals are the same set as
+        the given targets.
+
+        The given targets must be terminals of the tree.
+
+        To match both Bio.Nexus.Trees and the other multi-target methods in
+        Bio.Phylo, arguments to this method can be specified either of two ways:
+        (i) as a single list of targets, or (ii) separately specified targets,
+        e.g. is_monophyletic(t1, t2, t3) -- but not both.
+
+        For convenience, this method returns the common ancestor (MCRA) of the
+        targets if they are monophyletic (instead of the value True), and False
+        otherwise.
 
         @return: common ancestor if terminals are monophyletic, otherwise False.
         """
-        target_set = set(terminals)
+        target_set = set(_combine_args(terminals, *more_terminals))
         current = self.root
         while True:
             if set(current.get_terminals()) == target_set:
@@ -442,8 +513,11 @@ class TreeMixin(object):
         """True if target is a descendent of this tree.
 
         Not required to be a direct descendent.
+        
+        To check only direct descendents of a clade, simply use list membership
+        testing: "if subclade in clade: ..."
         """
-        return (self.get_path(target, **kwargs) is not None)
+        return self.get_path(target, **kwargs) is not None
 
     def is_preterminal(self):
         """True if all direct descendents are terminal."""
@@ -484,6 +558,9 @@ class TreeMixin(object):
     def collapse_all(self):
         """Collapse all the descendents of this tree, leaving only terminals.
 
+        Branch lengths are preserved, i.e. the distance to each terminal stays
+        the same.
+
         To collapse only certain elements, use the collapse method directly in a
         loop with find_clades:
 
@@ -518,7 +595,7 @@ class TreeMixin(object):
 
         If taxon is from a bifurcation, the connecting node will be collapsed
         and its branch length added to remaining terminal node. This might be no
-        longer a meaningful value.
+        longer be a meaningful value.
 
         @return: parent clade of the pruned target
         """
@@ -557,10 +634,13 @@ class TreeMixin(object):
         return parent
 
     def split(self, n=2, branch_length=1.0):
-        """Speciation: generate n (default 2) new descendants.
+        """Generate n (default 2) new descendants.
+
+        In a species tree, this is a speciation event.
 
         New clades have the given branch_length and the same name as this
-        clade's root plus an integer suffix (counting from 0).
+        clade's root plus an integer suffix (counting from 0). For example,
+        splitting a clade named "A" produces sub-clades named "A0" and "A1".
         """
         clade_cls = type(self.root)
         base_name = self.root.name or ''
@@ -607,14 +687,6 @@ class Tree(TreeElement, TreeMixin):
         root = copy.deepcopy(clade)
         return cls(root, **kwargs)
 
-    # XXX Backward compatibility shim
-    @classmethod
-    def from_subtree(cls, clade, **kwargs):
-        """DEPRECATED: use from_clade() instead."""
-        warnings.warn("use from_clade() instead.""",
-                DeprecationWarning, stacklevel=2)
-        return cls.from_clade(clade, **kwargs)
-
     @classmethod
     def randomized(cls, taxa, branch_length=1.0, branch_stdev=None):
         """Create a randomized bifurcating tree given a list of taxa.
@@ -655,6 +727,78 @@ class Tree(TreeElement, TreeMixin):
         """The first clade in this tree (not itself)."""
         return self.root
 
+    def as_phyloxml(self, **kwargs):
+        """Convert this tree to a PhyloXML-compatible Phylogeny.
+
+        This lets you use the additional annotation types PhyloXML defines, and
+        save this information when you write this tree as 'phyloxml'.
+        """
+        from Bio.Phylo.PhyloXML import Phylogeny
+        return Phylogeny.from_tree(self, **kwargs)
+
+    def root_with_outgroup(self, outgroup_targets, *more_targets):
+        """Reroot this tree with the outgroup clade containing outgroup_targets.
+
+        Operates in-place.
+
+        Edge cases:
+
+         - If outgroup == self.root, no change
+         - If outgroup is terminal, create new bifurcating root node with a
+           0-length branch to the outgroup
+         - If outgroup is internal, use the given outgroup node as the new
+           trifurcating root, keeping branches the same
+         - If the original root was bifurcating, drop it from the tree,
+           preserving total branch lengths
+        """
+        # This raises a ValueError if any target is not in this tree
+        # Otherwise, common_ancestor guarantees outgroup is in this tree
+        outgroup = self.common_ancestor(outgroup_targets, *more_targets)
+        outgroup_path = self.get_path(outgroup)
+        if len(outgroup_path) == 0:
+            # Outgroup is the current root -- no change
+            return
+
+        prev_blen = outgroup.branch_length
+        if outgroup.is_terminal():
+            # Create a new root with a 0-length branch to the outgroup
+            outgroup.branch_length = 0.0
+            new_root = self.root.__class__(branch_length=None, clades=[outgroup])
+        else:
+            # Use the given outgroup node as the new (trifurcating) root
+            new_root = outgroup
+            new_root.branch_length = None
+
+        # Tracing the outgroup lineage backwards, reattach the subclades under a
+        # new root clade. Reverse the branches directly above the outgroup in
+        # the tree, but keep the descendants of those clades as they are.
+        new_parent = new_root
+        for parent in outgroup_path[-2::-1]:
+            parent.clades.pop(parent.clades.index(new_parent))
+            prev_blen, parent.branch_length = parent.branch_length, prev_blen
+            new_parent.clades.insert(0, parent)
+            new_parent = parent
+        # Finally, handle the original root according to number of descendents
+        old_root = self.root
+        old_root.clades.pop(old_root.clades.index(new_parent))
+        if len(old_root) == 1:
+            # Delete the old bifurcating root & add branch lengths
+            ingroup = old_root.clades[0]
+            if ingroup.branch_length:
+                ingroup.branch_length += prev_blen
+            else:
+                ingroup.branch_length = prev_blen
+            new_parent.clades.insert(0, ingroup)
+            # ENH: If annotations are attached to old_root, do... something.
+        else:
+            # Keep the old trifurcating/polytomous root as an internal node
+            old_root.branch_length = prev_blen
+            new_parent.clades.insert(0, old_root)
+
+        self.root = new_root
+        self.rooted = True
+        return
+
     # Method assumed by TreeMixin
 
     def is_terminal(self):
@@ -672,7 +816,7 @@ class Tree(TreeElement, TreeMixin):
         """
         if format_spec:
             from StringIO import StringIO
-            import _io
+            from Bio.Phylo import _io
             handle = StringIO()
             _io.write([self], handle, format_spec)
             return handle.getvalue()
@@ -729,10 +873,12 @@ class Clade(TreeElement, TreeMixin):
     @param clades: Sub-trees rooted directly under this tree's root.
     @type clades: list
     """
-    def __init__(self, branch_length=None, name=None, clades=None):
-        self.clades = clades or []
-        self.name = name
+    def __init__(self, branch_length=None, name=None, clades=None,
+            confidence=None):
         self.branch_length = branch_length
+        self.name = name
+        self.clades = clades or []
+        self.confidence = confidence
 
     @property
     def root(self):

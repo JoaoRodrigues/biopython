@@ -15,9 +15,6 @@ get_prosite_raw   Interface to the get-prosite-raw CGI script.
 get_sprot_raw     Interface to the get-sprot-raw CGI script.
 sprot_search_ful  Interface to the sprot-search-ful CGI script.
 sprot_search_de   Interface to the sprot-search-de CGI script.
-
-The function scanprosite1 is OBSOLETE; please see the
-Bio.ExPASy.ScanProsite module for this functionality.
 """
 
 import urllib
@@ -81,8 +78,9 @@ def get_sprot_raw(id, cgi=None):
     """
     if cgi :
         import warnings
+        import Bio
         warnings.warn("The cgi argument in get_sprot_raw is not "
-                      "supported anymore", DeprecationWarning)
+                      "supported anymore", Bio.BiopythonDeprecationWarning)
     return urllib.urlopen("http://www.uniprot.org/uniprot/%s.txt" % id)
 
 def sprot_search_ful(text, make_wild=None, swissprot=1, trembl=None,

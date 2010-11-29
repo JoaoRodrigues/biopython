@@ -3,23 +3,36 @@
 # license.  Please see the LICENSE file that should have been included
 # as part of this package.
 """Command line wrapper for the multiple alignment program Clustal W.
-
-http://www.clustal.org/
-
-Citation:
-
-Larkin MA, Blackshields G, Brown NP, Chenna R, McGettigan PA, McWilliam H, 
-Valentin F, Wallace IM, Wilm A, Lopez R, Thompson JD, Gibson TJ, Higgins DG.
-(2007). Clustal W and Clustal X version 2.0. Bioinformatics, 23, 2947-2948. 
-
-Last checked against versions: 1.83 and 2.0.10
 """
+
 import os
-import types
 from Bio.Application import _Option, _Switch, AbstractCommandline
 
 class ClustalwCommandline(AbstractCommandline):
-    """Command line wrapper for clustalw (version one or two)."""
+    """Command line wrapper for clustalw (version one or two).
+
+    http://www.clustal.org/
+
+    Example:
+
+    >>> from Bio.Align.Applications import ClustalwCommandline
+    >>> in_file = "unaligned.fasta"
+    >>> clustalw_cline = ClustalwCommandline("clustalw2", infile=in_file)
+    >>> print clustalw_cline
+    clustalw2 -infile=unaligned.fasta
+
+    You would typically run the command line with clustalw_cline() or via
+    the Python subprocess module, as described in the Biopython tutorial.
+
+    Citation:
+
+    Larkin MA, Blackshields G, Brown NP, Chenna R, McGettigan PA,
+    McWilliam H, Valentin F, Wallace IM, Wilm A, Lopez R, Thompson JD,
+    Gibson TJ, Higgins DG. (2007). Clustal W and Clustal X version 2.0.
+    Bioinformatics, 23, 2947-2948. 
+
+    Last checked against versions: 1.83 and 2.0.10
+    """
     #TODO - Should we default to cmd="clustalw2" now?
     def __init__(self, cmd="clustalw", **kwargs):
         self.parameters = \
@@ -63,7 +76,7 @@ class ClustalwCommandline(AbstractCommandline):
                     "Calculate NJ tree."),
             _Option(["-bootstrap", "-BOOTSTRAP", "BOOTSTRAP", "bootstrap"],
                     ["input"],
-                    lambda x: isinstance(x, types.IntType),
+                    lambda x: isinstance(x, int),
                     False,
                     "Bootstrap a NJ tree (n= number of bootstraps; def. = 1000).",
                     True),
@@ -137,7 +150,7 @@ class ClustalwCommandline(AbstractCommandline):
                     True),
             _Option(["-maxseqlen", "-MAXSEQLEN", "MAXSEQLEN", "maxseqlen"],
                     ["input"],
-                    lambda x: isinstance(x, types.IntType),
+                    lambda x: isinstance(x, int),
                     False,
                     "Maximum allowed input sequence length",
                     True),
@@ -150,29 +163,29 @@ class ClustalwCommandline(AbstractCommandline):
             # ***Fast Pairwise Alignments:***
             _Option(["-ktuple", "-KTUPLE", "KTUPLE", "ktuple"],
                     ["input"],
-                    lambda x: isinstance(x, types.IntType) or \
-                              isinstance(x, types.FloatType),
+                    lambda x: isinstance(x, int) or \
+                              isinstance(x, float),
                     False,
                     "Word size",
                     True),
             _Option(["-topdiags", "-TOPDIAGS", "TOPDIAGS", "topdiags"],
                     ["input"],
-                    lambda x: isinstance(x, types.IntType) or \
-                              isinstance(x, types.FloatType),
+                    lambda x: isinstance(x, int) or \
+                              isinstance(x, float),
                     False,
                     "Number of best diags.",
                     True),
             _Option(["-window", "-WINDOW", "WINDOW", "window"],
                     ["input"],
-                    lambda x: isinstance(x, types.IntType) or \
-                              isinstance(x, types.FloatType),
+                    lambda x: isinstance(x, int) or \
+                              isinstance(x, float),
                     False,
                     "Window around best diags.",
                     True),
             _Option(["-pairgap", "-PAIRGAP", "PAIRGAP", "pairgap"],
                     ["input"],
-                    lambda x: isinstance(x, types.IntType) or \
-                              isinstance(x, types.FloatType),
+                    lambda x: isinstance(x, int) or \
+                              isinstance(x, float),
                     False,
                     "Gap penalty",
                     True),
@@ -201,15 +214,15 @@ class ClustalwCommandline(AbstractCommandline):
                     True),
             _Option(["-pwgapopen", "-PWGAPOPEN", "PWGAPOPEN", "pwgapopen"],
                     ["input"],
-                    lambda x: isinstance(x, types.IntType) or \
-                              isinstance(x, types.FloatType),
+                    lambda x: isinstance(x, int) or \
+                              isinstance(x, float),
                     False,
                     "Gap opening penalty",
                     True),
             _Option(["-pwgapext", "-PWGAPEXT", "PWGAPEXT", "pwgapext"],
                     ["input"],
-                    lambda x: isinstance(x, types.IntType) or \
-                              isinstance(x, types.FloatType),
+                    lambda x: isinstance(x, int) or \
+                              isinstance(x, float),
                     False,
                     "Gap opening penalty",
                     True),
@@ -243,15 +256,15 @@ class ClustalwCommandline(AbstractCommandline):
                     True),
             _Option(["-gapopen", "-GAPOPEN", "GAPOPEN", "gapopen"],
                     ["input"],
-                    lambda x: isinstance(x, types.IntType) or \
-                              isinstance(x, types.FloatType),
+                    lambda x: isinstance(x, int) or \
+                              isinstance(x, float),
                     False,
                     "Gap opening penalty",
                     True),
             _Option(["-gapext", "-GAPEXT", "GAPEXT", "gapext"],
                     ["input"],
-                    lambda x: isinstance(x, types.IntType) or \
-                              isinstance(x, types.FloatType),
+                    lambda x: isinstance(x, int) or \
+                              isinstance(x, float),
                     False,
                     "Gap extension penalty",
                     True),
@@ -260,8 +273,8 @@ class ClustalwCommandline(AbstractCommandline):
                     "No end gap separation pen."),
             _Option(["-gapdist", "-GAPDIST", "GAPDIST", "gapdist"],
                     ["input"],
-                    lambda x: isinstance(x, types.IntType) or \
-                              isinstance(x, types.FloatType),
+                    lambda x: isinstance(x, int) or \
+                              isinstance(x, float),
                     False,
                     "Gap separation pen. range",
                     False),
@@ -276,15 +289,15 @@ class ClustalwCommandline(AbstractCommandline):
                     "List hydrophilic res."),
             _Option(["-maxdiv", "-MAXDIV", "MAXDIV", "maxdiv"],
                     ["input"],
-                    lambda x: isinstance(x, types.IntType) or \
-                              isinstance(x, types.FloatType),
+                    lambda x: isinstance(x, int) or \
+                              isinstance(x, float),
                     False,
                     "% ident. for delay",
                     True),
             _Option(["-transweight", "-TRANSWEIGHT", "TRANSWEIGHT", "transweight"],
                     ["input"],
-                    lambda x: isinstance(x, types.IntType) or \
-                              isinstance(x, types.FloatType),
+                    lambda x: isinstance(x, int) or \
+                              isinstance(x, float),
                     False,
                     "Transitions weighting",
                     True),
@@ -297,7 +310,7 @@ class ClustalwCommandline(AbstractCommandline):
                     True),
             _Option(["-numiter", "-NUMITER", "NUMITER", "numiter"],
                     ["input"],
-                    lambda x:  isinstance(x, types.IntType),
+                    lambda x:  isinstance(x, int),
                     False,
                     "maximum number of iterations to perform",
                     False),
@@ -352,53 +365,53 @@ class ClustalwCommandline(AbstractCommandline):
                     True),
             _Option(["-helixgap", "-HELIXGAP", "HELIXGAP", "helixgap"],
                     ["input"],
-                    lambda x: isinstance(x, types.IntType) or \
-                              isinstance(x, types.FloatType),
+                    lambda x: isinstance(x, int) or \
+                              isinstance(x, float),
                     False,
                     "Gap penalty for helix core residues",
                     True),
             _Option(["-strandgap", "-STRANDGAP", "STRANDGAP", "strandgap"],
                     ["input"],
-                    lambda x: isinstance(x, types.IntType) or \
-                              isinstance(x, types.FloatType),
+                    lambda x: isinstance(x, int) or \
+                              isinstance(x, float),
                     False,
                     "gap penalty for strand core residues",
                     True),
             _Option(["-loopgap", "-LOOPGAP", "LOOPGAP", "loopgap"],
                     ["input"],
-                    lambda x: isinstance(x, types.IntType) or \
-                              isinstance(x, types.FloatType),
+                    lambda x: isinstance(x, int) or \
+                              isinstance(x, float),
                     False,
                     "Gap penalty for loop regions",
                     True),
             _Option(["-terminalgap", "-TERMINALGAP", "TERMINALGAP", "terminalgap"],
                     ["input"],
-                    lambda x: isinstance(x, types.IntType) or \
-                              isinstance(x, types.FloatType),
+                    lambda x: isinstance(x, int) or \
+                              isinstance(x, float),
                     False,
                     "Gap penalty for structure termini",
                     True),
             _Option(["-helixendin", "-HELIXENDIN", "HELIXENDIN", "helixendin"],
                     ["input"],
-                    lambda x: isinstance(x, types.IntType),
+                    lambda x: isinstance(x, int),
                     False,
                     "Number of residues inside helix to be treated as terminal",
                     True),
             _Option(["-helixendout", "-HELIXENDOUT", "HELIXENDOUT", "helixendout"],
                     ["input"],
-                    lambda x: isinstance(x, types.IntType),
+                    lambda x: isinstance(x, int),
                     False,
                     "Number of residues outside helix to be treated as terminal",
                     True),
             _Option(["-strandendin", "-STRANDENDIN", "STRANDENDIN", "strandendin"],
                     ["input"],
-                    lambda x: isinstance(x, types.IntType),
+                    lambda x: isinstance(x, int),
                     False,
                     "Number of residues inside strand to be treated as terminal",
                     True),
             _Option(["-strandendout", "-STRANDENDOUT", "STRANDENDOUT", "strandendout"],
                     ["input"],
-                    lambda x: isinstance(x, types.IntType),
+                    lambda x: isinstance(x, int),
                     False,
                     "number of residues outside strand to be treated as terminal",
                     True),
@@ -412,7 +425,7 @@ class ClustalwCommandline(AbstractCommandline):
                     True),
             _Option(["-seed", "-SEED", "SEED", "seed"],
                     ["input"],
-                    lambda x: isinstance(x, types.IntType),
+                    lambda x: isinstance(x, int),
                     False,
                     "Seed number for bootstraps.",
                     True),

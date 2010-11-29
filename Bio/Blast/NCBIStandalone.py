@@ -49,6 +49,9 @@ blastall, blastpgp and rpsblast are considered to be obsolete now, and
 are likely to be deprecated and then removed in future releases.
 """
 
+import warnings
+warnings.warn("The plain text parser in this module still works at the time of writing, but is considered obsolete and updating it to cope with the latest versions of BLAST is not a priority for us.", PendingDeprecationWarning)
+
 import os
 import re
 
@@ -1758,6 +1761,8 @@ def blastall(blastcmd, program, database, infile, align_view='7', **keywds):
         'seqalign_file' : '-O',
         'outfile' : '-o',
         }
+    import warnings
+    warnings.warn("This function is obsolete, you are encouraged to the command line wrapper Bio.Blast.Applications.BlastallCommandline instead.", PendingDeprecationWarning)
     from Applications import BlastallCommandline
     cline = BlastallCommandline(blastcmd)
     cline.set_parameter(att2param['program'], program)
@@ -1841,6 +1846,8 @@ def blastpgp(blastcmd, database, infile, align_view='7', **keywds):
     
     """
 
+    import warnings
+    warnings.warn("This function is obsolete, you are encouraged to the command line wrapper Bio.Blast.Applications.BlastpgpCommandline instead.", PendingDeprecationWarning)
     _security_check_parameters(keywds)
 
     att2param = {
@@ -1959,6 +1966,8 @@ def rpsblast(blastcmd, database, infile, align_view="7", **keywds):
                         from the returned handles).
     """
 
+    import warnings
+    warnings.warn("This function is obsolete, you are encouraged to the command line wrapper Bio.Blast.Applications.BlastrpsCommandline instead.", PendingDeprecationWarning)
     _security_check_parameters(keywds)
     
     att2param = {
@@ -2016,7 +2025,7 @@ def _get_cols(line, cols_to_get, ncols=None, expected={}):
                          % (ncols, len(cols), line))
 
     # Check to make sure columns contain the correct data
-    for k in expected.keys():
+    for k in expected:
         if cols[k] != expected[k]:
             raise ValueError("I expected '%s' in column %d in line\n%s" \
                              % (expected[k], k, line))
@@ -2027,6 +2036,7 @@ def _get_cols(line, cols_to_get, ncols=None, expected={}):
         results.append(cols[c])
     return tuple(results)
 
+
 def _safe_int(str):
     try:
         return int(str)
@@ -2034,14 +2044,19 @@ def _safe_int(str):
         # Something went wrong.  Try to clean up the string.
         # Remove all commas from the string
         str = str.replace(',', '')
+    # try again after removing commas.
+    # Note int() will return a long rather than overflow
     try:
-        # try again.
         return int(str)
     except ValueError:
         pass
-    # If it fails again, maybe it's too long?
-    # XXX why converting to float?
-    return long(float(str))
+    # Call float to handle things like "54.3", note could lose precision, e.g.
+    # >>> int("5399354557888517312")
+    # 5399354557888517312
+    # >>> int(float("5399354557888517312"))
+    # 5399354557888517120
+    return int(float(str))
+
 
 def _safe_float(str):
     # Thomas Rosleff Soerensen (rosleff@mpiz-koeln.mpg.de) noted that

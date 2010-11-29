@@ -116,6 +116,7 @@ import math
 import warnings
 
 # BioPython imports
+import Bio
 from Bio import Alphabet
 from Bio.SubsMat import FreqTable
 
@@ -139,13 +140,11 @@ class SeqMat(dict):
    def _alphabet_from_matrix(self):
       ab_dict = {}
       s = ''
-      for i in self.keys():
+      for i in self:
          ab_dict[i[0]] = 1
          ab_dict[i[1]] = 1
-      letters_list = ab_dict.keys()
-      letters_list.sort()
-      for i in letters_list:
-         s = s + i
+      for i in sorted(ab_dict):
+         s += i
       self.alphabet.letters = s
 
    def __init__(self,data=None, alphabet=None,
@@ -165,7 +164,7 @@ class SeqMat(dict):
           mat_type==NOTYPE
       else:
           assert type(mat_type) == type(1)
-          warnings.warn("values for mat_type other than NOTYPE are deprecated; use the appropriate subclass of SeqMat instead", DeprecationWarning)
+          warnings.warn("values for mat_type other than NOTYPE are deprecated; use the appropriate subclass of SeqMat instead", Bio.BiopythonDeprecationWarning)
 
       # "data" may be:
       # 1) None --> then self.data is an empty dictionary
@@ -243,10 +242,10 @@ class SeqMat(dict):
       # This method should be removed once the usage of mat_type is removed.
       ent = 0.
       if self.mat_type == LO:
-         for i in self.keys():
+         for i in self:
             ent += obs_freq_mat[i]*self[i]/log(2)
       elif self.mat_type == SUBS:
-         for i in self.keys():
+         for i in self:
             if self[i] > EPSILON:
                ent += obs_freq_mat[i]*log(self[i])/log(2)
       else:
@@ -255,16 +254,16 @@ class SeqMat(dict):
    #
    def make_entropy(self):
       self.entropy = 0
-      for i in self.keys():
+      for i in self:
          if self[i] > EPSILON:
             self.entropy += self[i]*log(self[i])/log(2)
       self.entropy = -self.entropy
 
    def letter_sum(self,letter):
-      warnings.warn("SeqMat.letter_sum is deprecated; please use SeqMat.sum instead", DeprecationWarning)
+      warnings.warn("SeqMat.letter_sum is deprecated; please use SeqMat.sum instead", Bio.BiopythonDeprecationWarning)
       assert letter in self.alphabet.letters
       sum = 0.
-      for i in self.keys():
+      for i in self:
          if letter in i:
             if i[0] == i[1]:
                sum += self[i]
@@ -274,7 +273,7 @@ class SeqMat(dict):
 
    def all_letters_sum(self):
       import warnings
-      warnings.warn("SeqMat.all_letters_sum is deprecated; please use SeqMat.sum instead", DeprecationWarning)
+      warnings.warn("SeqMat.all_letters_sum is deprecated; please use SeqMat.sum instead", Bio.BiopythonDeprecationWarning)
       for letter in self.alphabet.letters:
          self.sum_letters[letter] = self.letter_sum(letter)
 
@@ -383,7 +382,7 @@ class SeqMat(dict):
    def __sub__(self,other):
       """ returns a number which is the subtraction product of the two matrices"""
       mat_diff = 0
-      for i in self.keys():
+      for i in self:
          mat_diff += (self[i] - other[i])
       return mat_diff
 
@@ -391,13 +390,13 @@ class SeqMat(dict):
       """ returns a matrix for which each entry is the multiplication product of the
       two matrices passed"""
       new_mat = copy.copy(self)
-      for i in self.keys():
+      for i in self:
          new_mat[i] *= other[i]
       return new_mat
 
    def __add__(self, other):
       new_mat = copy.copy(self)
-      for i in self.keys():
+      for i in self:
          new_mat[i] += other[i]
       return new_mat
 
@@ -455,7 +454,7 @@ def _exp_freq_table_from_obs_freq(obs_freq_mat):
    exp_freq_table = {}
    for i in obs_freq_mat.alphabet.letters:
       exp_freq_table[i] = 0.
-   for i in obs_freq_mat.keys():
+   for i in obs_freq_mat:
       if i[0] == i[1]:
          exp_freq_table[i[0]] += obs_freq_mat[i]
       else:
@@ -508,7 +507,7 @@ def _build_log_odds_mat(subs_mat,logbase=2,factor=10.0,round_digit=0,keep_nd=0):
          lo_mat[key] = round(factor*log(value)/log(logbase),round_digit)
    mat_min = min(lo_mat.values())
    if not keep_nd:
-      for i in lo_mat.keys():
+      for i in lo_mat:
          if lo_mat[i] <= -999:
             lo_mat[i] = mat_min
    return lo_mat
@@ -578,15 +577,14 @@ diagALL = 3
 
 def two_mat_relative_entropy(mat_1,mat_2,logbase=2,diag=diagALL):
    rel_ent = 0.
-   key_list_1 = mat_1.keys(); key_list_2 = mat_2.keys()
-   key_list_1.sort(); key_list_2.sort()
+   key_list_1 = sorted(mat_1)
+   key_list_2 = sorted(mat_2)
    key_list = []
    sum_ent_1 = 0.; sum_ent_2 = 0.
    for i in key_list_1:
       if i in key_list_2:
          key_list.append(i)
    if len(key_list_1) != len(key_list_2):
-   
       sys.stderr.write("Warning:first matrix has more entries than the second\n")
    if key_list_1 != key_list_2:
       sys.stderr.write("Warning: indices not the same between matrices\n")
@@ -636,7 +634,7 @@ def two_mat_DJS(mat_1,mat_2,pi_1=0.5,pi_2=0.5):
    assert not (pi_1 + pi_2 - 1.0 > EPSILON)
    sum_mat = SeqMat(build_later=1)
    sum_mat.ab_list = mat_1.ab_list
-   for i in mat_1.keys():
+   for i in mat_1:
       sum_mat[i] = pi_1 * mat_1[i] + pi_2 * mat_2[i]
    sum_mat.make_entropy()
    mat_1.make_entropy()

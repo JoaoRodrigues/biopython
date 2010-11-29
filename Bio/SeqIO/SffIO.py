@@ -8,7 +8,8 @@
 
 SFF was designed by 454 Life Sciences (Roche), the Whitehead Institute for
 Biomedical Research and the Wellcome Trust Sanger Institute. You are expected
-to use this module via the Bio.SeqIO functions under the format name "sff".
+to use this module via the Bio.SeqIO functions under the format name "sff" (or
+"sff-trim" as described below).
 
 For example, to iterate over the records in an SFF file,
 
@@ -144,9 +145,9 @@ region (i.e. the sequence after trimming) starts with AAAGA exactly (the non-
 degenerate bit of this pretend primer):
 
     >>> from Bio import SeqIO
-    >>> records = (record for record in \
-                   SeqIO.parse("Roche/E3MFGYR02_random_10_reads.sff","sff") \
-                   if record.seq[record.annotations["clip_qual_left"]:].startswith("AAAGA"))
+    >>> records = (record for record in 
+    ...            SeqIO.parse("Roche/E3MFGYR02_random_10_reads.sff","sff") 
+    ...            if record.seq[record.annotations["clip_qual_left"]:].startswith("AAAGA"))
     >>> count = SeqIO.write(records, "temp_filtered.sff", "sff")
     >>> print "Selected %i records" % count
     Selected 2 records
@@ -193,17 +194,18 @@ from Bio.SeqRecord import SeqRecord
 import struct
 import sys
 
-#This is a hack, want "\0" on Python 2.x and b"\0" on Python 3.x, etc
-_null = "\0".encode("ascii")
-_sff = ".sff".encode("ascii")
-_hsh = ".hsh".encode("ascii")
-_srt = ".srt".encode("ascii")
-_mft = ".mft".encode("ascii")
+from Bio._py3k import _bytes_to_string, _as_bytes
+_null = _as_bytes("\0")
+_sff = _as_bytes(".sff")
+_hsh = _as_bytes(".hsh")
+_srt = _as_bytes(".srt")
+_mft = _as_bytes(".mft")
+#This is a hack because char 255 is special in unicode:
 try:
-    #If running on Python 3.x, this will do flag = b"\xff"
+    #This works on Python 2.6+ or Python 3.0
     _flag = eval(r'b"\xff"')
 except SyntaxError:
-    #Must be on Python 2.x
+    #Must be on Python 2.4 or 2.5
     _flag = "\xff" #Char 255
 
 def _sff_file_header(handle):
@@ -211,22 +213,24 @@ def _sff_file_header(handle):
 
     Assumes the handle is at the start of the file, will read forwards
     though the header and leave the handle pointing at the first record.
-    Returns a tuple of values from the header.
+    Returns a tuple of values from the header (header_length, index_offset,
+    index_length, number_of_reads, flows_per_read, flow_chars, key_sequence)
 
     >>> handle = open("Roche/greek.sff", "rb")
-    >>> header_length, index_offset, index_length, number_of_reads, \
-        flows_per_read, flow_chars, key_sequence = _sff_file_header(handle)
-    >>> header_length
+    >>> values = _sff_file_header(handle)
+    >>> print values[0]
     840
-    >>> print index_offset, index_length
-    65040 256
-    >>> print number_of_reads
+    >>> print values[1]
+    65040
+    >>> print values[2]
+    256
+    >>> print values[3]
     24
-    >>> print flows_per_read
+    >>> print values[4]
     800
-    >>> key_sequence
+    >>> values[-1]
     'TCAG'
-    
+
     """
     if hasattr(handle,"mode") and "U" in handle.mode.upper():
         raise ValueError("SFF files must NOT be opened in universal new "
@@ -272,8 +276,8 @@ def _sff_file_header(handle):
     if (index_offset!=0) ^ (index_length!=0):
         raise ValueError("Index offset %i but index length %i" \
                          % (index_offset, index_length))
-    flow_chars = handle.read(number_of_flows_per_read)
-    key_sequence = handle.read(key_length)
+    flow_chars = _bytes_to_string(handle.read(number_of_flows_per_read))
+    key_sequence = _bytes_to_string(handle.read(key_length))
     #According to the spec, the header_length field should be the total number
     #of bytes required by this set of header fields, and should be equal to
     #"31 + number_of_flows_per_read + key_length" rounded up to the next value
@@ -292,8 +296,8 @@ def _sff_file_header(handle):
 def _sff_do_slow_index(handle):
     """Generates an index by scanning though all the reads in an SFF file (PRIVATE).
 
-    This is a slow but generic approach if we can't parse the provided index (if
-    present).
+    This is a slow but generic approach if we can't parse the provided index
+    (if present).
 
     Will use the handle seek/tell functions.
     """
@@ -331,7 +335,7 @@ def _sff_do_slow_index(handle):
             raise ValueError("Malformed read header, says length is %i:\n%s" \
                              % (read_header_length, repr(data)))
         #now the name and any padding (remainder of header)
-        name = handle.read(name_length)
+        name = _bytes_to_string(handle.read(name_length))
         padding = read_header_length - read_header_size - name_length
         if handle.read(padding).count(_null) != padding:
             raise ValueError("Post name %i byte padding region contained data" \
@@ -358,8 +362,8 @@ def _sff_find_roche_index(handle):
     Makes a number of hard coded assumptions based on reverse engineered SFF
     files from Roche 454 machines.
 
-    Returns a tuple of read count, SFF "index" offset and size, XML offset and
-    size, and the actual read index offset and size.
+    Returns a tuple of read count, SFF "index" offset and size, XML offset
+    and size, and the actual read index offset and size.
 
     Raises a ValueError for unsupported or non-Roche index blocks.
     """    
@@ -423,16 +427,46 @@ def _sff_find_roche_index(handle):
                          % (repr(magic_number), repr(data)))
 
 def _sff_read_roche_index_xml(handle):
-    """Reads any existing Roche style XML manifest data in the SFF "index" (PRIVATE).
+    """Reads any existing Roche style XML manifest data in the SFF "index" (PRIVATE, DEPRECATED).
 
     Will use the handle seek/tell functions. Returns a string.
+
+    This has been replaced by ReadRocheXmlManifest. We would normally just
+    delete an old private function without warning, but I believe some people
+    are using this so we'll handle this with a deprecation warning.
+    """
+    import warnings
+    warnings.warn("Private function _sff_read_roche_index_xml is deprecated. "
+                  "Use new public function ReadRocheXmlManifest instead",
+                  DeprecationWarning)
+    return ReadRocheXmlManifest(handle)
+
+
+def ReadRocheXmlManifest(handle):
+    """Reads any Roche style XML manifest data in the SFF "index".
+
+    The SFF file format allows for multiple different index blocks, and Roche
+    took advantage of this to define their own index block wich also embeds
+    an XML manifest string. This is not a publically documented extension to
+    the SFF file format, this was reverse engineered.
+    
+    The handle should be to an SFF file opened in binary mode. This function
+    will use the handle seek/tell functions and leave the handle in an
+    arbitrary location.
+
+    Any XML manifest found is returned as a Python string, which you can then
+    parse as appropriate, or reuse when writing out SFF files with the
+    SffWriter class.
+
+    Returns a string, or raises a ValueError if an Roche manifest could not be
+    found.
     """
     number_of_reads, header_length, index_offset, index_length, xml_offset, \
     xml_size, read_index_offset, read_index_size = _sff_find_roche_index(handle)
     if not xml_offset or not xml_size:
         raise ValueError("No XML manifest found")
     handle.seek(xml_offset)
-    return handle.read(xml_size)
+    return _bytes_to_string(handle.read(xml_size))
 
 
 #This is a generator function!
@@ -443,15 +477,15 @@ def _sff_read_roche_index(handle):
 
     This works on ".srt1.00" and ".mft1.00" style Roche SFF index blocks.
 
-    Roche SFF indices use base 255 not 256, meaning we see bytes in range the range
-    0 to 254 only. This appears to be so that byte 0xFF (character 255) can be used
-    as a marker character to separate entries (required if the read name lengths
-    vary).
+    Roche SFF indices use base 255 not 256, meaning we see bytes in range the
+    range 0 to 254 only. This appears to be so that byte 0xFF (character 255)
+    can be used as a marker character to separate entries (required if the
+    read name lengths vary).
 
-    Note that since only four bytes are used for the read offset, this is limited to
-    255^4 bytes (nearly 4GB). If you try to use the Roche sfffile tool to combined
-    SFF files beyound this limit, they issue a warning and ommit the index (and
-    manifest).
+    Note that since only four bytes are used for the read offset, this is
+    limited to 255^4 bytes (nearly 4GB). If you try to use the Roche sfffile
+    tool to combine SFF files beyound this limit, they issue a warning and
+    omit the index (and manifest).
     """
     number_of_reads, header_length, index_offset, index_length, xml_offset, \
     xml_size, read_index_offset, read_index_size = _sff_find_roche_index(handle)
@@ -468,7 +502,7 @@ def _sff_read_roche_index(handle):
             data += more
             if more == _flag: break
         assert data[-1:] == _flag, data[-1:]
-        name = data[:-6]
+        name = _bytes_to_string(data[:-6])
         off4, off3, off2, off1, off0 = struct.unpack(fmt, data[-6:-1])
         offset = off0 + 255*off1 + 65025*off2 + 16581375*off3
         if off4:
@@ -510,7 +544,7 @@ def _sff_read_seq_record(handle, number_of_flows_per_read, flow_chars,
         raise ValueError("Malformed read header, says length is %i" \
                          % read_header_length)
     #now the name and any padding (remainder of header)
-    name = handle.read(name_length)
+    name = _bytes_to_string(handle.read(name_length))
     padding = read_header_length - read_header_size - name_length
     if handle.read(padding).count(_null) != padding:
         raise ValueError("Post name %i byte padding region contained data" \
@@ -520,7 +554,7 @@ def _sff_read_seq_record(handle, number_of_flows_per_read, flow_chars,
     flow_values = handle.read(read_flow_size) #unpack later if needed
     temp_fmt = ">%iB" % seq_len # used for flow index and quals
     flow_index = handle.read(seq_len) #unpack later if needed
-    seq = handle.read(seq_len)
+    seq = _bytes_to_string(handle.read(seq_len)) #TODO - Use bytes in Seq?
     quals = list(struct.unpack(temp_fmt, handle.read(seq_len)))
     #now any padding...
     padding = (read_flow_size + seq_len*3)%8
@@ -570,10 +604,10 @@ def SffIterator(handle, alphabet=Alphabet.generic_dna, trim=False):
     alphabet - optional alphabet, defaults to generic DNA.
     trim - should the sequences be trimmed?
 
-    The resulting SeqRecord objects should match those from a paired
-    FASTA and QUAL file converted from the SFF file using the Roche
-    454 tool ssfinfo. i.e. The sequence will be mixed case, with the
-    trim regions shown in lower case.
+    The resulting SeqRecord objects should match those from a paired FASTA
+    and QUAL file converted from the SFF file using the Roche 454 tool
+    ssfinfo. i.e. The sequence will be mixed case, with the trim regions
+    shown in lower case.
 
     This function is used internally via the Bio.SeqIO functions:
 
@@ -660,8 +694,6 @@ def SffIterator(handle, alphabet=Alphabet.generic_dna, trim=False):
     #in the file...
     for read in range(number_of_reads):
         if index_offset and handle.tell() == index_offset:
-            #import warnings
-            #warnings.warn("Found SFF index before read %i (not at end)" % (read+1))
             offset = index_offset + index_length
             if offset % 8:
                 offset += 8 - (offset % 8)
@@ -703,16 +735,14 @@ class SffWriter(SequenceWriter):
 
         handle - Output handle, ideally in binary write mode.
         index - Boolean argument, should we try and write an index?
-        xml - Optional string argument, xml to be recorded in the index block.
+        xml - Optional string argument, xml manifest to be recorded in the index
+              block (see function ReadRocheXmlManifest for reading this data).
         """
         if hasattr(handle,"mode") and "U" in handle.mode.upper():
             raise ValueError("SFF files must NOT be opened in universal new "
-                             "lines mode. Binary mode is recommended (although "
-                             "on Unix the default mode is also fine).")
-        elif hasattr(handle,"mode") and "B" not in handle.mode.upper() \
-        and sys.platform == "win32":
-            raise ValueError(\
-                "SFF files must be opened in binary mode on Windows")
+                             "lines mode. Binary mode is required")
+        elif hasattr(handle,"mode") and "B" not in handle.mode.upper():
+            raise ValueError("SFF files must be opened in binary mode")
         self.handle = handle
         self._xml = xml
         if index:
@@ -754,8 +784,8 @@ class SffWriter(SequenceWriter):
             #return 0
             raise ValueError("Need at least one record for SFF output")
         try:
-            self._key_sequence = record.annotations["flow_key"]
-            self._flow_chars = record.annotations["flow_chars"]
+            self._key_sequence = _as_bytes(record.annotations["flow_key"])
+            self._flow_chars = _as_bytes(record.annotations["flow_chars"])
             self._number_of_flows_per_read = len(self._flow_chars)
         except KeyError:
             raise ValueError("Missing SFF flow information")
@@ -785,12 +815,13 @@ class SffWriter(SequenceWriter):
         self._index_start = handle.tell() #need for header
         #XML...
         if self._xml is not None:
-            xml = self._xml
+            xml = _as_bytes(self._xml)
         else:
             from Bio import __version__
             xml = "<!-- This file was output with Biopython %s -->\n" % __version__
             xml += "<!-- This XML and index block attempts to mimic Roche SFF files -->\n"
             xml += "<!-- This file may be a combination of multiple SFF files etc -->\n"
+            xml = _as_bytes(xml)
         xml_len = len(xml)
         #Write to the file...
         fmt = ">I4BLL"
@@ -886,9 +917,9 @@ class SffWriter(SequenceWriter):
         This assumes the header has been done.
         """
         #Basics
-        name = record.id
+        name = _as_bytes(record.id)
         name_len = len(name)
-        seq = str(record.seq).upper()
+        seq = _as_bytes(str(record.seq).upper())
         seq_len = len(seq)
         #Qualities
         try:
@@ -899,8 +930,8 @@ class SffWriter(SequenceWriter):
         try:
             flow_values = record.annotations["flow_values"]
             flow_index = record.annotations["flow_index"]
-            if self._key_sequence != record.annotations["flow_key"] \
-            or self._flow_chars != record.annotations["flow_chars"]:
+            if self._key_sequence != _as_bytes(record.annotations["flow_key"]) \
+            or self._flow_chars != _as_bytes(record.annotations["flow_chars"]):
                 raise ValueError("Records have inconsistent SFF flow data")
         except KeyError:
             raise ValueError("Missing SFF flow information")
@@ -928,8 +959,8 @@ class SffWriter(SequenceWriter):
             if offset > 4244897280:
                 import warnings
                 warnings.warn("Read %s has file offset %i, which is too large "
-                              "to store in the Roche SFF index structure. No index "
-                              "block will be recorded." % (name, offset))
+                              "to store in the Roche SFF index structure. No "
+                              "index block will be recorded." % (name, offset))
                 #No point recoring the offsets now
                 self._index = None
             else:
@@ -982,7 +1013,7 @@ class SffWriter(SequenceWriter):
 if __name__ == "__main__":
     print "Running quick self test"
     filename = "../../Tests/Roche/E3MFGYR02_random_10_reads.sff"
-    metadata = _sff_read_roche_index_xml(open(filename, "rb"))
+    metadata = ReadRocheXmlManifest(open(filename, "rb"))
     index1 = sorted(_sff_read_roche_index(open(filename, "rb")))
     index2 = sorted(_sff_do_slow_index(open(filename, "rb")))
     assert index1 == index2
@@ -1039,7 +1070,7 @@ if __name__ == "__main__":
     
     sff_trim = list(SffIterator(open(filename, "rb"), trim=True))
 
-    print _sff_read_roche_index_xml(open(filename, "rb"))
+    print ReadRocheXmlManifest(open(filename, "rb"))
 
     from Bio import SeqIO
     filename = "../../Tests/Roche/E3MFGYR02_random_10_reads_no_trim.fasta"
@@ -1094,7 +1125,7 @@ if __name__ == "__main__":
     index2 = sorted(_sff_do_slow_index(open(filename, "rb")))
     assert index1 == index2
     try:
-        print _sff_read_roche_index_xml(open(filename, "rb"))
+        print ReadRocheXmlManifest(open(filename, "rb"))
         assert False, "Should fail!"
     except ValueError:
         pass
@@ -1207,7 +1238,7 @@ if __name__ == "__main__":
     for old, new in zip(records, records2):
         assert str(old.seq)==str(new.seq)
     try:
-        print _sff_read_roche_index_xml(open("../../Tests/Roche/E3MFGYR02_alt_index_at_end.sff", "rb"))
+        print ReadRocheXmlManifest(open("../../Tests/Roche/E3MFGYR02_alt_index_at_end.sff", "rb"))
         assert False, "Should fail!"
     except ValueError:
         pass

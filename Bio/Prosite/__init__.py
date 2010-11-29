@@ -57,12 +57,13 @@ _RecordConsumer       Consumes Prosite data to a Record object.
 """
 
 import warnings
+import Bio
 warnings.warn("Bio.Prosite is deprecated, and will be removed in a"\
               " future release of Biopython. Most of the functionality "
               " is now provided by Bio.ExPASy.Prosite.  If you want to "
               " continue to use Bio.Prosite, please get in contact "
               " via the mailing lists to avoid its permanent removal from"\
-              " Biopython.", DeprecationWarning)
+              " Biopython.", Bio.BiopythonDeprecationWarning)
 
 from types import *
 import re
@@ -730,7 +731,7 @@ def index_file(filename, indexname, rec2key=None):
     end = 0L
     for record in records:
         start = end
-        end = long(handle.tell())
+        end = handle.tell()
         length = end - start
         
         if rec2key is not None:

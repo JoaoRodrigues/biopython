@@ -6,7 +6,13 @@
 import os
 from StringIO import StringIO
 from Bio import AlignIO
+import Bio
+
+import warnings
+warnings.filterwarnings("ignore", category=Bio.BiopythonDeprecationWarning)
 from Bio import Clustalw
+warnings.filters.pop()
+
 from Bio.Align.Generic import Alignment
 
 

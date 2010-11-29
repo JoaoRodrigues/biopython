@@ -269,9 +269,7 @@ def _SeqIO_to_alignment_iterator(handle, format, alphabet=None, seq_count=None):
         records = list(SeqIO.parse(handle, format, alphabet))
         if records:
             yield MultipleSeqAlignment(records, alphabet)
-        else:
-            #No alignment found!
-            pass
+    raise StopIteration
 
 def _force_alphabet(alignment_iterator, alphabet):
     """Iterate over alignments, over-riding the alphabet (PRIVATE)."""
@@ -329,9 +327,12 @@ def parse(handle, format, seq_count=None, alphabet=None):
     """
     from Bio import SeqIO
 
+    handle_close = False
+
     if isinstance(handle, basestring):
         handle = open(handle, "rU")
         #TODO - On Python 2.5+ use with statement to close handle
+        handle_close = True
 
     #Try and give helpful error messages:
     if not isinstance(format, basestring):
@@ -350,22 +351,29 @@ def parse(handle, format, seq_count=None, alphabet=None):
     if format in _FormatToIterator:
         iterator_generator = _FormatToIterator[format]
         if alphabet is None : 
-            return iterator_generator(handle, seq_count)
-        try:
-            #Initially assume the optional alphabet argument is supported
-            return iterator_generator(handle, seq_count, alphabet=alphabet)
-        except TypeError:
-            #It isn't supported.
-            return _force_alphabet(iterator_generator(handle, seq_count),
-                                   alphabet)
+            i = iterator_generator(handle, seq_count)
+        else:
+            try:
+                #Initially assume the optional alphabet argument is supported
+                i = iterator_generator(handle, seq_count, alphabet=alphabet)
+            except TypeError:
+                #It isn't supported.
+                i = _force_alphabet(iterator_generator(handle, seq_count),
+                                    alphabet)
 
     elif format in SeqIO._FormatToIterator:
         #Exploit the existing SeqIO parser to the dirty work!
-        return _SeqIO_to_alignment_iterator(handle, format,
+        i = _SeqIO_to_alignment_iterator(handle, format,
                                             alphabet=alphabet,
                                             seq_count=seq_count)
     else:
         raise ValueError("Unknown format '%s'" % format)
+
+    #This imposes some overhead... wait until we drop Python 2.4 to fix it
+    for a in i:
+        yield a
+    if handle_close:
+        handle.close()
 
 def read(handle, format, seq_count=None, alphabet=None):
     """Turns an alignment file into a single MultipleSeqAlignment object.

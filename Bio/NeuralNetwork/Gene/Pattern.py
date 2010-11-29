@@ -9,7 +9,7 @@ handle any of the different specific patterns.
 import random
 
 # biopython
-from Bio import utils
+from Bio.Alphabet import _verify_alphabet
 from Bio.Seq import Seq, MutableSeq
 
 class PatternIO:
@@ -63,9 +63,9 @@ class PatternIO:
         for seq_pattern in seq_pattern_list:
             if isinstance(seq_pattern, MutableSeq):
                 seq = seq_pattern.toseq()
-                all_patterns.append(seq.data)
+                all_patterns.append(seq.tostring())
             elif isinstance(seq_pattern, Seq):
-                all_patterns.append(seq_pattern.data)
+                all_patterns.append(seq_pattern.tostring())
             else:
                 raise ValueError("Unexpected pattern type %r" % seq_pattern)
 
@@ -96,7 +96,7 @@ class PatternIO:
                     test_pattern = cur_pattern
                 for pattern_item in test_pattern: 
                     pattern_seq = Seq(pattern_item, self._alphabet)
-                    if not(utils.verify_alphabet(pattern_seq)):
+                    if not(_verify_alphabet(pattern_seq)):
                         raise ValueError("Pattern %s not matching alphabet %s"
                                          % (cur_pattern, self._alphabet))
 
@@ -130,7 +130,7 @@ class PatternRepository:
 
         # create the list representation
         self._pattern_list = []
-        for pattern_name in self._pattern_dict.keys():
+        for pattern_name in self._pattern_dict:
             self._pattern_list.append((self._pattern_dict[pattern_name],
                                        pattern_name))
 

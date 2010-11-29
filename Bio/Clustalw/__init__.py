@@ -1,14 +1,14 @@
 # This code is part of the Biopython distribution and governed by its
 # license.  Please see the LICENSE file that should have been included
 # as part of this package.
-"""Code for calling ClustalW and parsing its output (OBSOLETE).
+"""Code for calling ClustalW and parsing its output (DEPRECATED).
 
 This module has been superseded by the Bio.AlignIO framework for
 alignment parsing, and the ClustalW command line wrapper in
 Bio.Align.Applications for calling the tool. These are both described
 in the current version of the Biopython Tutorial and Cookbook.
-This means Bio.Clustalw is now obsolete and is likely to be deprecated
-and eventually removed in future releases of Biopython.
+This means Bio.Clustalw is now deprecated and likely to be
+removed in future releases of Biopython.
 
 A set of classes to interact with the multiple alignment command
 line program clustalw. 
@@ -28,6 +28,10 @@ o do_alignment
 classes:
 o ClustalAlignment
 o MultipleAlignCL"""
+
+import Bio
+import warnings
+warnings.warn("Bio.Clustalw is deprecated. Please use the Bio.AlignIO framework for alignment parsing, and the ClustalW command line wrapper in Bio.Align.Applications for calling the tool. These are both described in the current version of the Biopython Tutorial and Cookbook.", Bio.BiopythonDeprecationWarning)
 
 # standard library
 import os
@@ -75,6 +79,8 @@ def parse_file(file_name, alphabet = IUPAC.unambiguous_dna, debug_level = 0):
     >>> assert clustalw_string == align.format("clustal")
     """ 
 
+    import warnings
+    warnings.warn("This function is obsolete, and any new code should call Bio.AlignIO instead.", PendingDeprecationWarning)
     # Avoid code duplication by calling Bio.AlignIO to do this for us.
     handle = open(file_name, 'r')
     from Bio import AlignIO
@@ -124,6 +130,8 @@ def do_alignment(command_line, alphabet=None):
     the Python subprocess module (and Bio.AlignIO for parsing) as described
     in the tutorial.
     """
+    import warnings
+    warnings.warn("This function (and the associated command line object) are now obsolete. Please use the Bio.Align.Applications.ClustalwCommandline wrapper with the Python subprocess module (and Bio.AlignIO for parsing) as described in the tutorial.", PendingDeprecationWarning)
     #We don't need to supply any piped input, but we setup the
     #standard input pipe anyway as a work around for a python
     #bug if this is called from a Windows GUI program.  For
@@ -195,6 +203,8 @@ class ClustalAlignment(Alignment):
     you must do align.format("clustal"), which supports other formats too.
     """
     # the default version to use if one isn't set
+    import warnings
+    warnings.warn("This class is obsolete.", PendingDeprecationWarning)
     DEFAULT_VERSION = '1.81'
     
     def __init__(self, alphabet = Alphabet.Gapped(IUPAC.ambiguous_dna)):
@@ -219,6 +229,8 @@ class MultipleAlignCL:
     standardised Bio.Application style interface. This is described in the
     tutorial, with examples using ClustalW.
     """
+    import warnings
+    warnings.warn("This command line wrapper is considerd obsolete. Please use the replacement Bio.Align.Applications.ClustalwCommandline wrapper instead, which uses the standardised Bio.Application style interface. This is described in the tutorial, with examples using ClustalW.", PendingDeprecationWarning)
     # set the valid options for different parameters
     OUTPUT_TYPES = ['GCG', 'GDE', 'PHYLIP', 'PIR', 'NEXUS', 'FASTA']
     OUTPUT_ORDER = ['INPUT', 'ALIGNED']

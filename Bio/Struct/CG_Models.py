@@ -1,11 +1,9 @@
 #!/usr/bin/env python
 # encoding: utf-8
-"""
-CG_Models.py
-
-Created by João Rodrigues on 2010-08-04.
-Copyright (c) 2010 __MyCompanyName__. All rights reserved.
-"""
+# Copyright (C) 2010, Joao Rodrigues (anaryin@gmail.com)
+# This code is part of the Biopython distribution and governed by its
+# license.  Please see the LICENSE file that should have been included
+# as part of this package.
 
 from copy import deepcopy
 

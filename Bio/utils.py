@@ -4,10 +4,22 @@
 # license.  Please see the LICENSE file that should have been included
 # as part of this package.
 
-"""Miscellaneous functions for dealing with sequences (obsolete?)."""
+"""Miscellaneous functions for dealing with sequences (DEPRECATED).
+
+This module is deprecated, and is expected to be removed in the next release.
+If you use this module, please contact the Biopython developers via the
+mailing lists.
+"""
+
+import warnings
+import Bio
+warnings.warn("Bio.utils has been deprecated, and we intend to remove it in "
+              "the next release of Biopython.", Bio.BiopythonDeprecationWarning)
 
 import Seq
 import Alphabet
+
+from Bio.Alphabet import _verify_alphabet as verify_alphabet
 
 from PropertyManager import default_manager
 
@@ -15,36 +27,22 @@ def ungap(seq):
     """given a sequence with gap encoding, return the ungapped sequence"""
     #TODO - Fix this?  It currently assumes the outmost AlphabetEncoder
     #is for the gap.  Consider HasStopCodon(Gapped(Protein())) as a test case.
-    import warnings
-    warnings.warn("Bio.utils.ungap() has been deprecated, and we"
-                  " intend to remove it in a future release of Biopython."
-                  " Instead, please use the ungap method of the Seq object "
-                  " (added in Biopython 1.53).",
-                  DeprecationWarning)
+    warnings.warn("Bio.utils has been deprecated, and we intend to remove it "
+                  "in the next release of Biopython. Instead of function "
+                  "Bio.utils.ungap please use the ungap method of the Seq "
+                  "object (added in Biopython 1.53).",
+                  Bio.BiopythonDeprecationWarning)
     gap = seq.gap_char
     letters = []
-    for c in seq.data:
+    for c in seq:
         if c != gap:
             letters.append(c)
     return Seq.Seq("".join(letters), seq.alphabet.alphabet)
 
-def verify_alphabet(seq):
-    letters = {}
-    for c in seq.alphabet.letters:
-        letters[c] = 1
-    try:
-        for c in seq.data:
-            letters[c]
-    except KeyError:
-        return 0
-    return 1
-
 def count_monomers(seq):
     dict = {}
-#    bugfix: string.count(s,c) raises an AttributeError. Iddo Friedberg 16 Mar. 04
-#    s = buffer(seq.data)  # works for strings and array.arrays
     for c in seq.alphabet.letters:
-        dict[c] = seq.data.count(c)
+        dict[c] = seq.count(c)
     return dict
 
 def percent_monomers(seq):

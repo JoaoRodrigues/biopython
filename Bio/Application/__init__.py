@@ -27,6 +27,13 @@ import StringIO
 import subprocess
 import re
 
+#TODO - Remove this hack once we drop Python 2.4 support.
+try:
+    from subprocess import CalledProcessError as _ProcessCalledError
+except:
+    #For Python 2.4 use Exception as base class
+    _ProcessCalledError = Exception
+
 from Bio import File
 
 #Use this regular expresion to test the property names are going to
@@ -47,105 +54,47 @@ _reserved_names = ["and", "del", "from", "not", "while", "as", "elif",
 #These are reserved names due to the way the wrappers work
 _local_reserved_names = ["set_parameter"]
 
-def generic_run(commandline):
-    """Run an application with the given commandline (DEPRECATED).
 
-    This expects a pre-built commandline that derives from 
-    AbstractCommandline, and returns a ApplicationResult object
-    to get results from a program, along with handles of the
-    standard output and standard error.
-
-    WARNING - This will read in the full program output into memory!
-    This may be in issue when the program writes a large amount of
-    data to standard output.
-
-    NOTE - This function is considered to be obsolete, and we intend to
-    deprecate it and then remove it in future releases of Biopython.
-    We now recommend you invoke subprocess directly, using str(commandline)
-    to turn an AbstractCommandline wrapper into a command line string. This
-    will give you full control of the tool's input and output as well.
-    """
-    import warnings
-    warnings.warn("Bio.Application.generic_run and the associated "
-                  "Bio.Application.ApplicationResult are deprecated. "
-                  "Please use the Bio.Application based wrappers with "
-                  "the built in Python module subprocess instead, as "
-                  "described in the Biopython Tutorial.",
-                  DeprecationWarning)
-    #We don't need to supply any piped input, but we setup the
-    #standard input pipe anyway as a work around for a python
-    #bug if this is called from a Windows GUI program.  For
-    #details, see http://bugs.python.org/issue1124861
-    child = subprocess.Popen(str(commandline),
-                             stdin=subprocess.PIPE,
-                             stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE,
-                             universal_newlines=True,
-                             shell=(sys.platform!="win32"))
-    #Use .communicate as might get deadlocks with .wait(), see Bug 2804/2806
-    r_out, e_out = child.communicate()
-    # capture error code:
-    error_code = child.returncode
-    return ApplicationResult(commandline, error_code), \
-           File.UndoHandle(StringIO.StringIO(r_out)), \
-           File.UndoHandle(StringIO.StringIO(e_out))
-
-class ApplicationResult:
-    """Make results of a program available through a standard interface (DEPRECATED).
+class ApplicationError(_ProcessCalledError):
+    """Raised when an application returns a non-zero exit status.
     
-    This tries to pick up output information available from the program
-    and make it available programmatically.
-
-    NOTE - This class hase been deprecated and we intend to remove it in
-    a future release of Biopython.
+    The exit status will be stored in the returncode attribute, similarly
+    the command line string used in the cmd attribute, and (if captured)
+    stdout and stderr as strings.
+    
+    This exception is a subclass of subprocess.CalledProcessError
+    (unless run on Python 2.4 where that does not exist).
+    
+    >>> err = ApplicationError(-11, "helloworld", "", "Some error text")
+    >>> err.returncode, err.cmd, err.stdout, err.stderr
+    (-11, 'helloworld', '', 'Some error text')
+    >>> print err
+    Command 'helloworld' returned non-zero exit status -11, 'Some error text'
+    
     """
-    def __init__(self, application_cl, return_code):
-        """Intialize with the commandline from the program.
-        """
-        import warnings
-        warnings.warn("Bio.Application.ApplicationResult and the "
-                      "associated function Bio.Application.generic_run "
-                      "are deprecated. Please use the Bio.Application "
-                      "based wrappers with the built in Python module "
-                      "subprocess instead, as described in the Biopython "
-                      "Tutorial.", DeprecationWarning)
-        self._cl = application_cl
-
-        # provide the return code of the application
-        self.return_code = return_code
-
-        # get the application dependent results we can provide
-        # right now the only results we handle are output files
-        self._results = {}
-
-        for parameter in self._cl.parameters:
-            if "file" in parameter.param_types and \
-               "output" in parameter.param_types:
-                if parameter.is_set:
-                    self._results[parameter.names[-1]] = parameter.value
-
-    def get_result(self, output_name):
-        """Retrieve result information for the given output.
-
-        Supports any of the defined parameters aliases (assuming the
-        parameter is defined as an output).
-        """
+    def __init__(self, returncode, cmd, stdout="", stderr=""):
+        self.returncode = returncode
+        self.cmd = cmd
+        self.stdout = stdout
+        self.stderr = stderr
+    
+    def __str__(self):
+        #get first line of any stderr message
         try:
-            return self._results[output_name]
-        except KeyError, err:
-            #Try the aliases...
-            for parameter in self._cl.parameters:
-                if output_name in parameter.names:
-                    return self._results[parameter.names[-1]]
-            #No, really was a key error:
-            raise err
+            msg = self.stderr.lstrip().split("\n",1)[0].rstrip()
+        except:
+            msg = ""
+        if msg:
+            return "Command '%s' returned non-zero exit status %d, %r" \
+                   % (self.cmd, self.returncode, msg)
+        else:
+            return "Command '%s' returned non-zero exit status %d" \
+                   % (self.cmd, self.returncode)
+    
+    def __repr__(self):
+        return "ApplicationError(%i, %s, %s, %s)" \
+               % (self.returncode, self.cmd, self.stdout, self.stderr)
 
-    def available_results(self):
-        """Retrieve a list of all available results.
-        """
-        result_names = self._results.keys()
-        result_names.sort()
-        return result_names
 
 class AbstractCommandline(object):
     """Generic interface for constructing command line strings.
@@ -154,8 +103,8 @@ class AbstractCommandline(object):
     provide an implementation for a specific application.
 
     For a usage example we'll show one of the EMBOSS wrappers.  You can set
-    options when creating the wrapper object using keyword arguments - or later
-    using their corresponding properties:
+    options when creating the wrapper object using keyword arguments - or
+    later using their corresponding properties:
 
     >>> from Bio.Emboss.Applications import WaterCommandline
     >>> cline = WaterCommandline(gapopen=10, gapextend=0.5)
@@ -189,18 +138,23 @@ class AbstractCommandline(object):
     a valid command line for the tool.  For a complete example,
 
     >>> from Bio.Emboss.Applications import WaterCommandline
-    >>> cline = WaterCommandline(gapopen=10, gapextend=0.5)
-    >>> cline.asequence = "asis:ACCCGGGCGCGGT"
-    >>> cline.bsequence = "asis:ACCCGAGCGCGGT"
-    >>> cline.outfile = "temp_water.txt"
-    >>> print cline
+    >>> water_cmd = WaterCommandline(gapopen=10, gapextend=0.5)
+    >>> water_cmd.asequence = "asis:ACCCGGGCGCGGT"
+    >>> water_cmd.bsequence = "asis:ACCCGAGCGCGGT"
+    >>> water_cmd.outfile = "temp_water.txt"
+    >>> print water_cmd
     water -outfile=temp_water.txt -asequence=asis:ACCCGGGCGCGGT -bsequence=asis:ACCCGAGCGCGGT -gapopen=10 -gapextend=0.5
-    >>> cline
+    >>> water_cmd
     WaterCommandline(cmd='water', outfile='temp_water.txt', asequence='asis:ACCCGGGCGCGGT', bsequence='asis:ACCCGAGCGCGGT', gapopen=10, gapextend=0.5)
 
     You would typically run the command line via a standard Python operating
-    system call (e.g. using the subprocess module).
+    system call using the subprocess module for full control. For the simple
+    case where you just want to run the command and get the output:
+
+    stdout, stderr = water_cmd(capture=Ture)
     """
+    #Note the call example above is not a doctest as we can't handle EMBOSS
+    #(or any other tool) being missing in the unit tests.
     def __init__(self, cmd, **kwargs):
         """Create a new instance of a command line wrapper object."""
         # Init method - should be subclassed!
@@ -418,8 +372,70 @@ class AbstractCommandline(object):
             self.__dict__[name] = value
         else:
             self.set_parameter(name, value)  # treat as a parameter
+    
+    def __call__(self, stdin=None, stdout=True, stderr=True):
+        """Execute the command and waits for it to finish, returns output.
+        
+        Runs the command line tool and waits for it to finish. If it returns
+        a non-zero error level, an exception is raised. Otherwise two strings
+        are returned containing stdout and stderr.
+        
+        The optional stdin argument should be a string of data which will be
+        passed to the tool as standard input.
 
-                    
+        The optional stdout and stderr argument are treated as a booleans, and
+        control if the output should be captured (True, default), or ignored
+        by sending it to /dev/null to avoid wasting memory (False). In the
+        later case empty string(s) are returned.
+
+        Default example usage:
+
+        from Bio.Emboss.Applications import WaterCommandline
+        water_cmd = WaterCommandline(gapopen=10, gapextend=0.5, stdout=True,
+                                     asequence="a.fasta", bsequence="b.fasta")
+        print "About to run:\n%s" % water_cmd
+        std_output, err_output = water_cmd()
+
+        This functionality is similar to subprocess.check_output() added in
+        Python 2.7. In general if you require more control over running the
+        command, use subprocess directly.
+        
+        As of Biopython 1.56, when the program called returns a non-zero error
+        level, a custom ApplicationError exception is raised. This includes
+        any stdout and stderr strings captured as attributes of the exception
+        object, since they may be useful for diagnosing what went wrong.
+        """
+        if stdout:
+            stdout_arg = subprocess.PIPE
+        else:
+            stdout_arg = open(os.devnull)
+        if stderr:
+            stderr_arg = subprocess.PIPE
+        else:
+            stderr_arg = open(os.devnull)
+        #We may not need to supply any piped input, but we setup the
+        #standard input pipe anyway as a work around for a python
+        #bug if this is called from a Windows GUI program.  For
+        #details, see http://bugs.python.org/issue1124861
+        #
+        #Using universal newlines is important on Python 3, this
+        #gives unicode handles rather than bytes handles.
+        child_process = subprocess.Popen(str(self), stdin=subprocess.PIPE,
+                                         stdout=stdout_arg, stderr=stderr_arg,
+                                         universal_newlines=True,
+                                         shell=(sys.platform!="win32"))
+        #Use .communicate as can get deadlocks with .wait(), see Bug 2804
+        stdout_str, stderr_str = child_process.communicate(stdin)
+        #any stderr output should be merged with stdout or sent to dev null
+        if not stdout: assert not stdout_str
+        if not stderr: assert not stderr_str
+        return_code = child_process.returncode
+        if return_code:
+            raise ApplicationError(return_code, str(self),
+                                   stdout_str, stderr_str)
+        return stdout_str, stderr_str
+
+
 class _AbstractParameter:
     """A class to hold information about a parameter for a commandline.
 

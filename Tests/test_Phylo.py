@@ -5,12 +5,23 @@
 
 """Unit tests for the Bio.Phylo module."""
 
+import sys
 import unittest
 from cStringIO import StringIO
 
 from Bio import Phylo
 from Bio.Phylo import PhyloXML
 
+#TODO - Remove this hack
+#This will raise MissingPythonDependencyError if we don't have ElementTree
+#and thus skip the all these tests. A couple of them could be run without
+#ElementTree, but we're about drop Python 2.4 support so I don't mind.
+from Bio.Phylo import PhyloXMLIO as PXIO
+del PXIO
+
+# Example Newick and Nexus files
+EX_NEWICK = 'Nexus/int_node_labels.nwk'
+EX_NEXUS = 'Nexus/test_Nexus_input.nex'
 
 # Example PhyloXML files
 EX_APAF = 'PhyloXML/apaf.xml'
@@ -18,8 +29,51 @@ EX_BCL2 = 'PhyloXML/bcl_2.xml'
 EX_PHYLO = 'PhyloXML/phyloxml_examples.xml'
 
 
+class IOTests(unittest.TestCase):
+    """Tests for parsing and writing the supported formats."""
+
+    def test_newick(self):
+        """Read a Newick file with one tree."""
+        tree = Phylo.read(EX_NEWICK, 'newick')
+        self.assertEqual(len(tree.get_terminals()), 28)
+
+    def test_newick(self):
+        """Parse a Nexus file with multiple trees."""
+        trees = list(Phylo.parse(EX_NEXUS, 'nexus'))
+        self.assertEqual(len(trees), 3)
+        for tree in trees:
+            self.assertEqual(len(tree.get_terminals()), 9)
+
+    def test_convert(self):
+        """Convert a tree between all supported formats."""
+        mem_file_1 = StringIO()
+        mem_file_3 = StringIO()
+        if sys.version_info[0] == 3:
+            from io import BytesIO
+            mem_file_2 = BytesIO()
+        else:
+            mem_file_2 = StringIO()
+        Phylo.convert(EX_NEWICK, 'newick', mem_file_1, 'nexus')
+        mem_file_1.seek(0)
+        Phylo.convert(mem_file_1, 'nexus', mem_file_2, 'phyloxml')
+        mem_file_2.seek(0)
+        Phylo.convert(mem_file_2, 'phyloxml', mem_file_3, 'newick')
+        mem_file_3.seek(0)
+        tree = Phylo.read(mem_file_3, 'newick')
+        self.assertEqual(len(tree.get_terminals()), 28)
+
+
 class TreeTests(unittest.TestCase):
     """Tests for methods on BaseTree.Tree objects."""
+    def test_root_with_outgroup(self):
+        """Tree.root_with_outgroup: reroot at a given clade."""
+        tree = Phylo.read(EX_APAF, 'phyloxml')
+        orig_num_tips = len(tree.get_terminals())
+        orig_tree_len = tree.total_branch_length()
+        tree.root_with_outgroup('19_NEMVE', '20_NEMVE')
+        self.assertEqual(orig_num_tips, len(tree.get_terminals()))
+        self.assertAlmostEqual(orig_tree_len, tree.total_branch_length())
+
     # Magic method
     def test_str(self):
         """Tree.__str__: pretty-print to a string.
@@ -62,6 +116,10 @@ class MixinTests(unittest.TestCase):
         self.assertEqual(len(events), 2)
         self.assertEqual(events[0].speciations, 1)
         self.assertEqual(events[1].duplications, 1)
+        # string filter & find_any
+        tree = self.phylogenies[3]
+        taxonomy = tree.find_any("B. subtilis")
+        self.assertEqual(taxonomy.scientific_name, "B. subtilis")
         # integer filter
         tree = Phylo.read(EX_APAF, 'phyloxml')
         domains = list(tree.find_elements(start=5))
@@ -82,6 +140,10 @@ class MixinTests(unittest.TestCase):
         self.assertEqual(len(octo), 1)
         self.assertTrue(isinstance(octo[0], PhyloXML.Clade))
         self.assertEqual(octo[0].taxonomies[0].code, 'OCTVU')
+        # string filter
+        dee = self.phylogenies[10].find_clades('D').next()
+        self.assertEqual(dee.name, 'D')
+
 
     def test_find_terminal(self):
         """TreeMixin: find_elements() with terminal argument."""
@@ -99,7 +161,7 @@ class MixinTests(unittest.TestCase):
 
     def test_get_path(self):
         """TreeMixin: get_path() method."""
-        path = self.phylogenies[1].get_path({'name': 'B'})
+        path = self.phylogenies[1].get_path('B')
         self.assertEqual(len(path), 2)
         self.assertAlmostEqual(path[0].branch_length, 0.06)
         self.assertAlmostEqual(path[1].branch_length, 0.23)
@@ -108,7 +170,7 @@ class MixinTests(unittest.TestCase):
     def test_trace(self):
         """TreeMixin: trace() method."""
         tree = self.phylogenies[1]
-        path = tree.trace({'name': 'A'}, {'name': 'C'})
+        path = tree.trace('A', 'C')
         self.assertEqual(len(path), 3)
         self.assertAlmostEqual(path[0].branch_length, 0.06)
         self.assertAlmostEqual(path[2].branch_length, 0.4)
@@ -119,12 +181,12 @@ class MixinTests(unittest.TestCase):
     def test_common_ancestor(self):
         """TreeMixin: common_ancestor() method."""
         tree = self.phylogenies[1]
-        lca = tree.common_ancestor({'name': 'A'}, {'name': 'B'})
+        lca = tree.common_ancestor('A', 'B')
         self.assertEqual(lca, tree.clade[0])
-        lca = tree.common_ancestor({'name': 'A'}, {'name': 'C'})
+        lca = tree.common_ancestor('A', 'C')
         self.assertEqual(lca, tree.clade)
         tree = self.phylogenies[10]
-        lca = tree.common_ancestor({'name': 'A'}, {'name': 'B'}, {'name': 'C'})
+        lca = tree.common_ancestor('A', 'B', 'C')
         self.assertEqual(lca, tree.clade[0])
 
     def test_depths(self):
@@ -139,12 +201,12 @@ class MixinTests(unittest.TestCase):
     def test_distance(self):
         """TreeMixin: distance() method."""
         t = self.phylogenies[1]
-        self.assertAlmostEqual(t.distance({'name': 'A'}), 0.162)
-        self.assertAlmostEqual(t.distance({'name': 'B'}), 0.29)
-        self.assertAlmostEqual(t.distance({'name': 'C'}), 0.4)
-        self.assertAlmostEqual(t.distance({'name': 'A'}, {'name': 'B'}), 0.332)
-        self.assertAlmostEqual(t.distance({'name': 'A'}, {'name': 'C'}), 0.562)
-        self.assertAlmostEqual(t.distance({'name': 'B'}, {'name': 'C'}), 0.69)
+        self.assertAlmostEqual(t.distance('A'), 0.162)
+        self.assertAlmostEqual(t.distance('B'), 0.29)
+        self.assertAlmostEqual(t.distance('C'), 0.4)
+        self.assertAlmostEqual(t.distance('A', 'B'), 0.332)
+        self.assertAlmostEqual(t.distance('A', 'C'), 0.562)
+        self.assertAlmostEqual(t.distance('B', 'C'), 0.69)
 
     def test_is_bifurcating(self):
         """TreeMixin: is_bifurcating() method."""
@@ -163,6 +225,8 @@ class MixinTests(unittest.TestCase):
         self.assertEqual(tree.is_monophyletic(abc), tree.clade[0])
         self.assertEqual(tree.is_monophyletic(ab), False)
         self.assertEqual(tree.is_monophyletic(d), tree.clade[1])
+        # Alternate argument form
+        self.assertEqual(tree.is_monophyletic(*abcd), tree.root)
 
     def test_total_branch_length(self):
         """TreeMixin: total_branch_length() method."""

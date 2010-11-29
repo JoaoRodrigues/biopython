@@ -8,7 +8,7 @@ then be used for creating the neural networks, with occurances of motifs
 going into the network instead of raw sequence data.
 """
 # biopython
-from Bio import utils
+from Bio.Alphabet import _verify_alphabet
 from Bio.Seq import Seq
 
 # local modules
@@ -71,13 +71,13 @@ class MotifFinder:
 
             # now start finding motifs in the sequence
             for start in range(len(seq_record.seq) - (motif_size - 1)):
-                motif = seq_record.seq[start:start + motif_size].data
+                motif = seq_record.seq[start:start + motif_size].tostring()
 
                 # if we are being alphabet strict, make sure the motif
                 # falls within the specified alphabet
                 if alphabet is not None:
                     motif_seq = Seq(motif, alphabet)
-                    if utils.verify_alphabet(motif_seq):
+                    if _verify_alphabet(motif_seq):
                         all_motifs = self._add_motif(all_motifs, motif)
 
                 # if we are not being strict, just add the motif
@@ -109,7 +109,7 @@ class MotifFinder:
         motif_diffs = {}
 
         # first deal with all of the keys from the first motif
-        for cur_key in first_motifs.keys():
+        for cur_key in first_motifs:
             if cur_key in second_motifs:
                 motif_diffs[cur_key] = first_motifs[cur_key] - \
                                        second_motifs[cur_key]
@@ -118,10 +118,10 @@ class MotifFinder:
 
         # now see if there are any keys from the second motif
         # that we haven't got yet.
-        missing_motifs = second_motifs.keys()[:]
+        missing_motifs = list(second_motifs)
 
         # remove all of the motifs we've already added
-        for added_motif in motif_diffs.keys():
+        for added_motif in motif_diffs:
             if added_motif in missing_motifs:
                 missing_motifs.remove(added_motif)
 
@@ -187,7 +187,7 @@ class MotifCoder:
         
         # count all of the motifs we are looking for in the sequence
         for start in range(len(sequence) - (self._motif_size - 1)):
-            motif = sequence[start:start + self._motif_size].data
+            motif = sequence[start:start + self._motif_size].tostring()
 
             if motif in seq_motifs:
                 seq_motifs[motif] += 1

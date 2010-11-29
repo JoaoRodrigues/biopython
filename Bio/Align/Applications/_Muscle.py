@@ -3,24 +3,38 @@
 # license.  Please see the LICENSE file that should have been included
 # as part of this package.
 """Command line wrapper for the multiple alignment program MUSCLE.
-
-http://www.drive5.com/muscle/
-
-Citations:
-
-Edgar, Robert C. (2004), MUSCLE: multiple sequence alignment with high accuracy
-and high throughput, Nucleic Acids Research 32(5), 1792-97.
-
-Edgar, R.C. (2004) MUSCLE: a multiple sequence alignment method with reduced
-time and space complexity. BMC Bioinformatics 5(1): 113.
-
-Last checked against version: 3.7
 """
-import types
+
 from Bio.Application import _Option, _Switch, AbstractCommandline
 
 class MuscleCommandline(AbstractCommandline):
-    """Command line wrapper for the multiple alignment program MUSCLE."""
+    """Command line wrapper for the multiple alignment program MUSCLE.
+
+    http://www.drive5.com/muscle/
+
+    Example:
+
+    >>> from Bio.Align.Applications import MuscleCommandline
+    >>> muscle_exe = r"C:\Program Files\Aligments\muscle3.8.31_i86win32.exe"
+    >>> in_file = r"C:\My Documents\unaligned.fasta"
+    >>> out_file = r"C:\My Documents\aligned.fasta"
+    >>> muscle_cline = MuscleCommandline(muscle_exe, input=in_file, out=out_file)
+    >>> print muscle_cline
+    C:\Program Files\Aligments\muscle3.8.31_i86win32.exe -in "C:\My Documents\unaligned.fasta" -out "C:\My Documents\aligned.fasta"
+
+    You would typically run the command line with muscle_cline() or via
+    the Python subprocess module, as described in the Biopython tutorial.
+
+    Citations:
+
+    Edgar, Robert C. (2004), MUSCLE: multiple sequence alignment with high
+    accuracy and high throughput, Nucleic Acids Research 32(5), 1792-97.
+
+    Edgar, R.C. (2004) MUSCLE: a multiple sequence alignment method with
+    reduced time and space complexity. BMC Bioinformatics 5(1): 113.
+
+    Last checked against version: 3.7, briefly against 3.8
+    """
     def __init__(self, cmd="muscle", **kwargs):
         CLUSTERING_ALGORITHMS   = ["upgma", "upgmb", "neighborjoining"]
         DISTANCE_MEASURES_ITER1 = ["kmer6_6", "kmer20_3", "kmer20_4", "kbit20_3",
@@ -55,14 +69,14 @@ class MuscleCommandline(AbstractCommandline):
                     0),
             #anchorspacing   Integer              32                 Minimum spacing between
             _Option(["-anchorspacing", "anchorspacing"], ["input"],
-                    lambda x: isinstance(x, types.IntType),
+                    lambda x: isinstance(x, int),
                     0,
                     "Minimum spacing between anchor columns",
                     0),
             #center          Floating point       [1]                Center parameter.
             #                                                        Should be negative.
             _Option(["-center", "center"], ["input"],
-                    lambda x: isinstance(x, types.FloatType),
+                    lambda x: isinstance(x, float),
                     0,
                     "Center parameter - should be negative",
                     0),
@@ -82,7 +96,7 @@ class MuscleCommandline(AbstractCommandline):
             #diaglength      Integer              24                 Minimum length of
             #                                                        diagonal.
             _Option(["-diaglength", "diaglength"], ["input"],
-                    lambda x: isinstance(x, types.IntType),
+                    lambda x: isinstance(x, int),
                     0,
                     "Minimum length of diagonal",
                     0),
@@ -90,7 +104,7 @@ class MuscleCommandline(AbstractCommandline):
             #                                                        positions at ends of
             #                                                        diagonal.
             _Option(["-diagmargin", "diagmargin"], ["input"],
-                    lambda x: isinstance(x, types.IntType),
+                    lambda x: isinstance(x, int),
                     0,
                     "Discard this many positions at ends of diagonal",
                     0),
@@ -118,7 +132,7 @@ class MuscleCommandline(AbstractCommandline):
             #gapopen         Floating point       [1]                The gap open score.
             #                                                        Must be negative.
             _Option(["-gapopen", "gapopen"], ["input"],
-                    lambda x: isinstance(x, types.FloatType),
+                    lambda x: isinstance(x, float),
                     0,
                     "Gap open score - negative number",
                     0),
@@ -126,7 +140,7 @@ class MuscleCommandline(AbstractCommandline):
             #                                                        determining whether a
             #                                                        region is hydrophobic.
             _Option(["-hydro", "hydro"], ["input"],
-                    lambda x: isinstance(x, types.IntType),
+                    lambda x: isinstance(x, int),
                     0,
                     "Window size for hydrophobic region",
                     0),
@@ -134,7 +148,7 @@ class MuscleCommandline(AbstractCommandline):
             #                                                        open/close penalties in
             #                                                        hydrophobic regions.
             _Option(["-hydrofactor", "hydrofactor"], ["input"],
-                    lambda x: isinstance(x, types.FloatType),
+                    lambda x: isinstance(x, float),
                     0,
                     "Multiplier for gap penalties in hydrophobic regions",
                     0),
@@ -156,7 +170,7 @@ class MuscleCommandline(AbstractCommandline):
             #                                                        merge into one
             #                                                        diagonal.
             _Option(["-maxdiagbreak", "maxdiagbreak"], ["input"],
-                    lambda x: isinstance(x, types.IntType),
+                    lambda x: isinstance(x, int),
                     0,
                     "Maximum distance between two diagonals that allows " + \
                     "them to merge into one diagonal",
@@ -170,14 +184,14 @@ class MuscleCommandline(AbstractCommandline):
             #                                                        means one hour and 30
             #                                                        minutes.
             _Option(["-maxhours", "maxhours"], ["input"],
-                    lambda x: isinstance(x, types.FloatType),
+                    lambda x: isinstance(x, float),
                     0,
                     "Maximum time to run in hours",
                     0),
             #maxiters        Integer 1, 2 ...     16                 Maximum number of
             #                                                        iterations.
             _Option(["-maxiters", "maxiters"], ["input"],
-                    lambda x: isinstance(x, types.IntType),
+                    lambda x: isinstance(x, int),
                     0,
                     "Maximum number of iterations",
                     0),
@@ -185,7 +199,7 @@ class MuscleCommandline(AbstractCommandline):
             #                                                        trees to build in
             #                                                        iteration 2.
             _Option(["-maxtrees", "maxtrees"], ["input"],
-                    lambda x: isinstance(x, types.IntType),
+                    lambda x: isinstance(x, int),
                     0,
                     "Maximum number of trees to build in iteration 2",
                     0),
@@ -193,7 +207,7 @@ class MuscleCommandline(AbstractCommandline):
             #                                                        must have to be an
             #                                                        anchor.
             _Option(["-minbestcolscore", "minbestcolscore"], ["input"],
-                    lambda x: isinstance(x, types.FloatType),
+                    lambda x: isinstance(x, float),
                     0,
                     "Minimum score a column must have to be an anchor",
                     0),
@@ -201,7 +215,7 @@ class MuscleCommandline(AbstractCommandline):
             #                                                        a column must have to
             #                                                        be an anchor.
             _Option(["-minsmoothscore", "minsmoothscore"], ["input"],
-                    lambda x: isinstance(x, types.FloatType),
+                    lambda x: isinstance(x, float),
                     0,
                     "Minimum smoothed score a column must have to " + \
                     "be an anchor",
@@ -251,14 +265,14 @@ class MuscleCommandline(AbstractCommandline):
             #                                                        score for smoothing
             #                                                        purposes.
             _Option(["-smoothscoreceil", "smoothscoreceil"], ["input"],
-                    lambda x: isinstance(x, types.FloatType),
+                    lambda x: isinstance(x, float),
                     0,
                     "Maximum value of column score for smoothing",
                     0),
             #smoothwindow    Integer              7                  Window used for anchor
             #                                                        column smoothing.
             _Option(["-smoothwindow", "smoothwindow"], ["input"],
-                    lambda x: isinstance(x, types.IntType),
+                    lambda x: isinstance(x, int),
                     0,
                     "Window used for anchor column smoothing",
                     0),
@@ -270,7 +284,7 @@ class MuscleCommandline(AbstractCommandline):
             #                                                        neighbor linkage (1
             #                                                        SUEFF).
             _Option(["-sueff", "sueff"], ["input"],
-                    lambda x: isinstance(x, types.FloatType),
+                    lambda x: isinstance(x, float),
                     0,
                     "Constant used in UPGMB clustering",
                     0),
@@ -407,7 +421,7 @@ class MuscleCommandline(AbstractCommandline):
             #                                   file. Default is to group sequences by
             #                                   similarity (group).
             _Switch(["-stable", "stable"], ["input"],
-                    "Do not group similar sequences in output"),
+                    "Do not group similar sequences in output (not supported in v3.8)"),
             ############## log-expectation profile score ######################
             # One of either -le, -sp, or -sv
             #

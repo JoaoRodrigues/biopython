@@ -295,8 +295,7 @@ class SeqRecord(object):
         ...                     IUPAC.protein),
         ...                 id="1JOY", name="EnvZ",
         ...                 description="Homodimeric domain of EnvZ from E. coli")
-        >>> rec.letter_annotations["secondary_structure"] = \
-            "  S  SSSSSSHHHHHTTTHHHHHHHHHHHHHHHHHHHHHHTHHHHHHHHHHHHHHHHHHHHHTT  "
+        >>> rec.letter_annotations["secondary_structure"] = "  S  SSSSSSHHHHHTTTHHHHHHHHHHHHHHHHHHHHHHTHHHHHHHHHHHHHHHHHHHHHTT  "
         >>> rec.features.append(SeqFeature(FeatureLocation(20,21),
         ...                     type = "Site"))
 
@@ -645,15 +644,25 @@ class SeqRecord(object):
         supported by Bio.SeqIO as an output file format. See also the
         SeqRecord's format() method.
         """
-        if format_spec:
-            from StringIO import StringIO
-            from Bio import SeqIO
-            handle = StringIO()
-            SeqIO.write([self], handle, format_spec)
-            return handle.getvalue()
-        else:
+        if not format_spec:
             #Follow python convention and default to using __str__
             return str(self)    
+        from Bio import SeqIO
+        if format_spec in SeqIO._BinaryFormats:
+            #Return bytes on Python 3
+            try:
+                #This is in Python 2.6+, but we need it on Python 3
+                from io import BytesIO
+                handle = BytesIO()
+            except ImportError:
+                #Must be on Python 2.5 or older
+                from StringIO import StringIO
+                handle = StringIO()
+        else:
+            from StringIO import StringIO
+            handle = StringIO()
+        SeqIO.write(self, handle, format_spec)
+        return handle.getvalue()
 
     def __len__(self):
         """Returns the length of the sequence.
@@ -777,7 +786,7 @@ class SeqRecord(object):
         del l
         for ref in other.dbxrefs:
             if ref not in answer.dbxrefs:
-                answer.append(ref)
+                answer.dbxrefs.append(ref)
         #Take common id/name/description/annotation
         if self.id == other.id:
             answer.id = self.id

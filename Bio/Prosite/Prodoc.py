@@ -48,6 +48,9 @@ _Scanner           Scans Prodoc-formatted data.
 _RecordConsumer    Consumes Prodoc data to a Record object.
 """
 
+import warnings
+warnings.warn("This module is OBSOLETE. Most of the functionality in this module has moved to Bio.ExPASy.Prodoc.", PendingDeprecationWarning)
+
 from types import *
 import os
 import sgmllib
@@ -315,7 +318,7 @@ def index_file(filename, indexname, rec2key=None):
     end = 0L
     for record in records:
         start = end
-        end = long(handle.tell())
+        end = handle.tell()
         length = end - start
 
         if rec2key is not None:

@@ -11,6 +11,7 @@ additional facilities.
 Command line options:
 
 --help        -- show usage info
+--offline     -- skip tests which require internet access
 -g;--generate -- write the output file for a test instead of comparing it.
                  The name of the test to write the output for must be
                  specified.
@@ -21,40 +22,6 @@ Command line options:
 doctest       -- run the docstring tests.
 By default, all tests are run.
 """
-
-# This is the list of modules containing docstring tests.
-# If you develop docstring tests for other modules, please add
-# those modules here.
-DOCTEST_MODULES = ["Bio.Application",
-                   "Bio.Seq",
-                   "Bio.SeqFeature",
-                   "Bio.SeqRecord",
-                   "Bio.SeqIO",
-                   "Bio.SeqIO.AceIO",
-                   "Bio.SeqIO.PhdIO",
-                   "Bio.SeqIO.QualityIO",
-                   "Bio.SeqIO.SffIO",
-                   "Bio.SeqUtils",
-                   "Bio.Align",
-                   "Bio.Align.Generic",
-                   "Bio.AlignIO",
-                   "Bio.AlignIO.StockholmIO",
-                   "Bio.Blast.Applications",
-                   "Bio.Clustalw",
-                   "Bio.Emboss.Applications",
-                   "Bio.KEGG.Compound",
-                   "Bio.KEGG.Enzyme",
-                   "Bio.Wise",
-                   "Bio.Wise.psw",
-                   "Bio.Motif",
-                  ]
-#Silently ignore any doctests for modules requiring numpy!
-try:
-    import numpy
-    DOCTEST_MODULES.extend(["Bio.Statistics.lowess"])
-except ImportError:
-    pass
-
 
 # The default verbosity (not verbose)
 VERBOSITY = 0
@@ -71,9 +38,53 @@ import unittest
 import doctest
 import distutils.util
 
+# This is the list of modules containing docstring tests.
+# If you develop docstring tests for other modules, please add
+# those modules here.
+DOCTEST_MODULES = ["Bio.Alphabet",
+                   "Bio.Application",
+                   "Bio.Seq",
+                   "Bio.SeqFeature",
+                   "Bio.SeqRecord",
+                   "Bio.SeqIO",
+                   "Bio.SeqIO.AceIO",
+                   "Bio.SeqIO.PhdIO",
+                   "Bio.SeqIO.QualityIO",
+                   "Bio.SeqIO.SffIO",
+                   "Bio.SeqUtils",
+                   "Bio.Align",
+                   "Bio.Align.Generic",
+                   "Bio.Align.Applications._Clustalw",
+                   "Bio.Align.Applications._Mafft",
+                   "Bio.Align.Applications._Muscle",
+                   "Bio.AlignIO",
+                   "Bio.AlignIO.StockholmIO",
+                   "Bio.Blast.Applications",
+                   "Bio.Clustalw",
+                   "Bio.Emboss.Applications",
+                   "Bio.KEGG.Compound",
+                   "Bio.KEGG.Enzyme",
+                   "Bio.Wise",
+                   "Bio.Wise.psw",
+                   "Bio.Motif",
+                  ]
+#Silently ignore any doctests for modules requiring numpy!
+try:
+    import numpy
+    DOCTEST_MODULES.extend(["Bio.Statistics.lowess",
+                            "Bio.PDB.Polypeptide",
+                            ])
+except ImportError:
+    pass
 
+#Skip Bio.Seq doctest under Python 3.0, see http://bugs.python.org/issue7490
+if sys.version_info[0:2] == (3,1):
+    DOCTEST_MODULES.remove("Bio.Seq")
+
+system_lang = os.environ.get('LANG', 'C') #Cache this
 
 def main(argv):
+    """Run tests, return number of failures (integer)."""
     # insert our paths in sys.path:
     # ../build/lib.*
     # ..
@@ -89,15 +100,17 @@ def main(argv):
     if os.access(build_path, os.F_OK):
         sys.path.insert(1, build_path)
 
-    # Use "export LANG=C" (which should work on Linux and similar) to
-    # try to avoid problems detecting optional command line tools on
-    # non-English OS (we may want 'command not found' in English)
-    os.environ['LANG']='C'
+    # Using "export LANG=C" (which should work on Linux and similar) can
+    # avoid problems detecting optional command line tools on
+    # non-English OS (we may want 'command not found' in English).
+    # HOWEVER, we do not want to change the default encoding which is
+    # rather important on Python 3 with unicode.
+    #lang = os.environ['LANG']
     
     # get the command line options
     try:
         opts, args = getopt.getopt(argv, 'gv', ["generate", "verbose",
-            "doctest", "help"])
+            "doctest", "help", "offline"])
     except getopt.error, msg:
         print msg
         print __doc__
@@ -110,6 +123,12 @@ def main(argv):
         if o == "--help":
             print __doc__
             return 0
+        if o == "--offline":
+            print "Skipping any tests requiring internet access"
+            #This is a bit of a hack...
+            import requires_internet
+            requires_internet.check.available = False
+            #The check() function should now report internet not available
         if o == "-g" or o == "--generate":
             if len(args) > 1:
                 print "Only one argument (the test name) needed for generate"
@@ -138,7 +157,7 @@ def main(argv):
 
     # run the tests
     runner = TestRunner(args, verbosity)
-    runner.run()
+    return runner.run()
 
 
 class ComparisonTestCase(unittest.TestCase):
@@ -166,7 +185,12 @@ class ComparisonTestCase(unittest.TestCase):
         outputdir = os.path.join(TestRunner.testdir, "output")
         outputfile = os.path.join(outputdir, self.name)
         try:
-            expected = open(outputfile, 'r')
+            if sys.version_info[0] >= 3:
+                #Python 3 problem: Can't use utf8 on output/test_geo
+                #due to micro (\xb5) and degrees (\xb0) symbols
+                expected = open(outputfile, encoding="latin")
+            else:
+                expected = open(outputfile, 'rU')
         except IOError:
             self.fail("Warning: Can't open %s for test %s" % (outputfile, self.name))
 
@@ -259,6 +283,10 @@ class TestRunner(unittest.TextTestRunner):
         from Bio import MissingExternalDependencyError
         result = self._makeResult()
         output = cStringIO.StringIO()
+        # Restore the language and thus default encoding (in case a prior
+        # test changed this, e.g. to help with detecting command line tools)
+        global system_lang
+        os.environ['LANG']=system_lang
         # Run the actual test inside a try/except to catch import errors.
         # Have to do a nested try because try/except/except/finally requires
         # python 2.5+
@@ -318,6 +346,7 @@ class TestRunner(unittest.TextTestRunner):
             sys.stdout = stdout
 
     def run(self):
+        """Run tests, return number of failures (integer)."""
         failures = 0
         startTime = time.time()
         for test in self.tests:
@@ -334,8 +363,11 @@ class TestRunner(unittest.TextTestRunner):
         sys.stderr.write("\n")
         if failures:
             sys.stderr.write("FAILED (failures = %d)\n" % failures)
+        return failures
 
 
 if __name__ == "__main__":
-    #Don't do a sys.exit(...) as it isn't nice if run from IDLE.
-    main(sys.argv[1:])
+    errors = main(sys.argv[1:])
+    if errors:
+        #Doing a sys.exit(...) isn't nice if run from IDLE...
+        sys.exit(1)

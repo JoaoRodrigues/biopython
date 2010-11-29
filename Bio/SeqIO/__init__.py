@@ -223,6 +223,8 @@ names are also used in Bio.AlignIO and include the following:
  - gb      - An alias for "genbank", for consistency with NCBI Entrez Utilities
  - ig      - The IntelliGenetics file format, apparently the same as the
              MASE alignment format.
+ - imgt    - An EMBL like format from IMGT where the feature tables are more
+             indented to allow for longer feature types.
  - phd     - Output from PHRED, used by PHRAP and CONSED for input.
  - pir     - A "FASTA like" format introduced by the National Biomedical
              Research Foundation (NBRF) for the Protein Information Resource
@@ -238,6 +240,8 @@ names are also used in Bio.AlignIO and include the following:
  - qual    - A "FASTA like" format holding PHRED quality values from
              sequencing DNA, but no actual sequences (usually provided
              in separate FASTA files).
+ - uniprot-xml - The UniProt XML format (replacement for the SwissProt plain
+             text format which we call "swiss")
 
 Note that while Bio.SeqIO can read all the above file formats, it cannot
 write to all of them.
@@ -308,6 +312,7 @@ import SffIO
 import SwissIO
 import TabIO
 import QualityIO #FastQ and qual files
+import UniprotIO
 
 #Convention for format names is "mainname-subtype" in lower case.
 #Please use the same names as BioPerl or EMBOSS where possible.
@@ -324,6 +329,7 @@ _FormatToIterator = {"fasta" : FastaIO.FastaIterator,
                      "genbank-cds" : InsdcIO.GenBankCdsFeatureIterator,
                      "embl" : InsdcIO.EmblIterator,
                      "embl-cds" : InsdcIO.EmblCdsFeatureIterator,
+                     "imgt" : InsdcIO.ImgtIterator,
                      "ig" : IgIO.IgIterator,
                      "swiss" : SwissIO.SwissIterator,
                      "phd" : PhdIO.PhdIterator,
@@ -339,12 +345,14 @@ _FormatToIterator = {"fasta" : FastaIO.FastaIterator,
                      "sff": SffIO.SffIterator,
                      #Not sure about this in the long run:
                      "sff-trim": SffIO._SffTrimIterator,
+                     "uniprot-xml": UniprotIO.UniprotIterator,
                      }
 
 _FormatToWriter = {"fasta" : FastaIO.FastaWriter,
                    "gb" : InsdcIO.GenBankWriter,
                    "genbank" : InsdcIO.GenBankWriter,
                    "embl" : InsdcIO.EmblWriter,
+                   "imgt" : InsdcIO.ImgtWriter,
                    "tab" : TabIO.TabWriter,
                    "fastq" : QualityIO.FastqPhredWriter,
                    "fastq-sanger" : QualityIO.FastqPhredWriter,
@@ -476,6 +484,8 @@ def parse(handle, format, alphabet=None):
     #string mode (see the leading r before the opening quote).
     from Bio import AlignIO
 
+    handle_close = False
+    
     if isinstance(handle, basestring):
         #Hack for SFF, will need to make this more general in future
         if format in _BinaryFormats :
@@ -483,6 +493,7 @@ def parse(handle, format, alphabet=None):
         else :
             handle = open(handle, "rU")
         #TODO - On Python 2.5+ use with statement to close handle
+        handle_close = True
 
     #Try and give helpful error messages:
     if not isinstance(format, basestring):
@@ -499,18 +510,24 @@ def parse(handle, format, alphabet=None):
     if format in _FormatToIterator:
         iterator_generator = _FormatToIterator[format]
         if alphabet is None:
-            return iterator_generator(handle)
-        try:
-            return iterator_generator(handle, alphabet=alphabet)
-        except:
-            return _force_alphabet(iterator_generator(handle), alphabet)
+            i = iterator_generator(handle)
+        else:
+            try:
+                i = iterator_generator(handle, alphabet=alphabet)
+            except TypeError:
+                i = _force_alphabet(iterator_generator(handle), alphabet)
     elif format in AlignIO._FormatToIterator:
         #Use Bio.AlignIO to read in the alignments
         #TODO - Can this helper function can be replaced with a generator
         #expression, or something from itertools?
-        return _iterate_via_AlignIO(handle, format, alphabet)
+        i = _iterate_via_AlignIO(handle, format, alphabet)
     else:
         raise ValueError("Unknown format '%s'" % format)
+    #This imposes some overhead... wait until we drop Python 2.4 to fix it
+    for r in i:
+        yield r
+    if handle_close:
+        handle.close()
 
 #This is a generator function
 def _iterate_via_AlignIO(handle, format, alphabet):
@@ -614,7 +631,7 @@ def to_dict(sequences, key_function=None):
     >>> filename = "GenBank/cor6_6.gb"
     >>> format = "genbank"
     >>> id_dict = SeqIO.to_dict(SeqIO.parse(filename, format))
-    >>> print sorted(id_dict.keys())
+    >>> print sorted(id_dict)
     ['AF297471.1', 'AJ237582.1', 'L31939.1', 'M81224.1', 'X55053.1', 'X62281.1']
     >>> print id_dict["L31939.1"].description
     Brassica rapa (clone bif72) kin mRNA, complete cds.
@@ -671,7 +688,7 @@ def index(filename, format, alphabet=None, key_function=None):
     >>> records = SeqIO.index("Quality/example.fastq", "fastq")
     >>> len(records)
     3
-    >>> sorted(records.keys())
+    >>> sorted(records)
     ['EAS54_6_R1_2_1_413_324', 'EAS54_6_R1_2_1_443_348', 'EAS54_6_R1_2_1_540_792']
     >>> print records["EAS54_6_R1_2_1_540_792"].format("fasta")
     >EAS54_6_R1_2_1_540_792
@@ -703,7 +720,7 @@ def index(filename, format, alphabet=None, key_function=None):
     >>> records = SeqIO.to_dict(SeqIO.parse(open("Quality/example.fastq"), "fastq"))
     >>> len(records)
     3
-    >>> sorted(records.keys())
+    >>> sorted(records)
     ['EAS54_6_R1_2_1_413_324', 'EAS54_6_R1_2_1_443_348', 'EAS54_6_R1_2_1_540_792']
     >>> print records["EAS54_6_R1_2_1_540_792"].format("fasta")
     >EAS54_6_R1_2_1_540_792
@@ -722,7 +739,7 @@ def index(filename, format, alphabet=None, key_function=None):
     ...                       key_function=make_tuple)
     >>> len(records)
     3
-    >>> sorted(records.keys())
+    >>> sorted(records)
     [(413, 324), (443, 348), (540, 792)]
     >>> print records[(540, 792)].format("fasta")
     >EAS54_6_R1_2_1_540_792
@@ -785,9 +802,10 @@ def to_alignment(sequences, alphabet=None, strict=True):
     >>> alignment = AlignIO.read(filename, "clustal")
     """
     import warnings
+    import Bio
     warnings.warn("The Bio.SeqIO.to_alignment(...) function is deprecated. "
                   "Please use the Bio.Align.MultipleSeqAlignment(...) object "
-                  "directly instead.", DeprecationWarning)
+                  "directly instead.", Bio.BiopythonDeprecationWarning)
     return MultipleSeqAlignment(sequences, alphabet)
 
 def convert(in_file, in_format, out_file, out_format, alphabet=None):

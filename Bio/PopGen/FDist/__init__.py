@@ -16,7 +16,7 @@ Functions:
 read             Parses a FDist record (file) into a Record object.
 
 
-Obsolete classes:
+Deprecated classes:
 RecordParser     Parses a FDist record (file) into a Record object.
 
 _Scanner         Scans a FDist record.
@@ -92,17 +92,21 @@ class Record:
             rep.append('\n')
         return "".join(rep)
     
-# Everything below is obsolete
+# Everything below is deprecated
 
 from Bio.ParserSupport import *
 
 class RecordParser(AbstractParser):
-    """Parses FDist data into a Record object (OBSOLETE).
+    """Parses FDist data into a Record object (DEPRECATED).
 
-    This function is OBSOLETE; plesae use the read() function in this module
-    instead.
+    This class is DEPRECATED; please use the read() function in this
+    module instead.
     """
     def __init__(self):
+        import warnings
+        from Bio import BiopythonDeprecationWarning
+        warnings.warn("Bio.PopGen.FDist.RecordParser is deprecated. Please use the read() function in this module instead.",
+              BiopythonDeprecationWarning)
         self._scanner = _Scanner()
         self._consumer = _RecordConsumer()
 
@@ -111,13 +115,19 @@ class RecordParser(AbstractParser):
         return self._consumer.data
 
 class _Scanner:
-    """Scans a FDist record (OBSOLETE).
+    """Scans a FDist record (DEPRECATED).
     
     There is only one record per file.
 
-    This function is OBSOLETE; plesae use the read() function in this module
-    instead.
+    This class is DEPRECATED; please use the read() function in this
+    module instead.
     """
+
+    def __init__(self):
+        import warnings
+        from Bio import BiopythonDeprecationWarning
+        warnings.warn("Bio.PopGen.FDist._Scanner is deprecated. Please use the read() function in this module instead.",
+              BiopythonDeprecationWarning)
 
     def feed(self, handle, consumer):
         """feed(self, handle, consumer)
@@ -154,15 +164,19 @@ class _Scanner:
         consumer.end_record()
 
 class _RecordConsumer(AbstractConsumer):
-    """Consumer that converts a FDist record to a Record object (OBSOLETE).
+    """Consumer that converts a FDist record to a Record object (DEPRECATED).
 
     Members:
     data    Record with FDist data.
 
-    This function is OBSOLETE; plesae use the read() function in this module
+    This class is DEPRECATED; please use the read() function in this module
     instead.
     """
     def __init__(self):
+        import warnings
+        from Bio import BiopythonDeprecationWarning
+        warnings.warn("Bio.PopGen.FDist._RecordConsumer is deprecated. Please use the read() function in this module instead.",
+              BiopythonDeprecationWarning)
         self.data = None
 
     def start_record(self):
@@ -182,4 +196,3 @@ class _RecordConsumer(AbstractConsumer):
 
     def new_locus(self, num_alleles, pop_data):
         self.data.loci_data.append((num_alleles, pop_data))
-

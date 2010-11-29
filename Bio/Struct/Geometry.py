@@ -23,9 +23,8 @@ def center_of_mass(entity, geometric=False):
     elif hasattr(entity, '__iter__') and [x for x in entity if x.level == 'A']:
         atom_list = entity
     else: # Some other weirdo object
-        raise ValueError('Center of Mass can only be calculated \
-                            from the following objects:\n \
-                            Structure, Model, Chain, Residue, list of Atoms.')
+        raise ValueError("Center of Mass can only be calculated from the following objects:\n"
+                            "Structure, Model, Chain, Residue, list of Atoms.")
     
     masses = []
     positions = [ [], [], [] ] # [ [X1, X2, ..] , [Y1, Y2, ...] , [Z1, Z2, ...] ]
@@ -35,12 +34,11 @@ def center_of_mass(entity, geometric=False):
         
         for i, coord in enumerate(atom.coord.tolist()):
             positions[i].append(coord)
-    
+
     # If there is a single atom with undefined mass complain loudly.
-    if '?' in set(masses) and not geometric:
-        from Bio.PDB.PDBExceptions import PDBConstructionException
-        PDBConstructionException("Some atoms have undefined masses. \
-                                  Use Geometrical C.o.M. instead.")
+    if 'ukn' in set(masses) and not geometric:
+        raise ValueError("Some Atoms don't have an element assigned.\n"
+                         "Try adding them manually or calculate the geometrical center of mass instead.")
     
     if geometric:
         return [sum(coord_list)/len(masses) for coord_list in positions]

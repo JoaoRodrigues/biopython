@@ -36,8 +36,15 @@ the allowed range of PHRED scores is 0 to 93 inclusive. The sequences and
 quality are then stored in pairs in a FASTA like format.
 
 Unfortunately there is no official document describing the FASTQ file format,
-and worse, several related but different variants exist.  Reasonable
-documentation exists at: http://maq.sourceforge.net/fastq.shtml
+and worse, several related but different variants exist. For more details,
+please read this open access publication::
+
+    The Sanger FASTQ file format for sequences with quality scores, and the
+    Solexa/Illumina FASTQ variants.
+    P.J.A.Cock (Biopython), C.J.Fields (BioPerl), N.Goto (BioRuby),
+    M.L.Heuer (BioJava) and P.M. Rice (EMBOSS).
+    Nucleic Acids Research 2010 38(6):1767-1771
+    http://dx.doi.org/10.1093/nar/gkp1137
 
 The good news is that Roche 454 sequencers can output files in the QUAL format,
 and sensibly they use PHREP style scores like Sanger.  Converting a pair of
@@ -51,7 +58,7 @@ own scoring system AND their own incompatible versions of the FASTQ format.
 Solexa/Illumina quality scores use Q = - 10 log10 ( Pe / (1-Pe) ), which can
 be negative.  PHRED scores and Solexa scores are NOT interchangeable (but a
 reasonable mapping can be achieved between them, and they are approximately
-equal for high quality reads).
+equal for higher quality reads).
 
 Confusingly early Solexa pipelines produced a FASTQ like file but using their
 own score mapping and an ASCII offset of 64. To make things worse, for the
@@ -101,7 +108,7 @@ offet of 33).  This means we can parse this file using Bio.SeqIO using
 "fastq" as the format name:
 
     >>> from Bio import SeqIO
-    >>> for record in SeqIO.parse(open("Quality/example.fastq"), "fastq"):
+    >>> for record in SeqIO.parse("Quality/example.fastq", "fastq"):
     ...     print record.id, record.seq
     EAS54_6_R1_2_1_413_324 CCCTTCTTGTCTTCAGCGTTTCTCC
     EAS54_6_R1_2_1_540_792 TTGGCAGGCCAAGGCCGATGGATCA
@@ -161,7 +168,7 @@ as the format! The reason for this is all these scores are high enough that
 the PHRED and Solexa scores are almost equal. The differences become apparent
 for poor quality reads. See the functions solexa_quality_from_phred and
 phred_quality_from_solexa for more details.
- 
+
 If you wanted to trim your sequences (perhaps to remove low quality regions,
 or to remove a primer sequence), try slicing the SeqRecord objects.  e.g.
 
@@ -185,7 +192,7 @@ or to remove a primer sequence), try slicing the SeqRecord objects.  e.g.
 If you wanted to, you could read in this FASTQ file, and save it as a QUAL file:
 
     >>> from Bio import SeqIO
-    >>> record_iterator = SeqIO.parse(open("Quality/example.fastq"), "fastq")
+    >>> record_iterator = SeqIO.parse("Quality/example.fastq", "fastq")
     >>> out_handle = open("Quality/temp.qual", "w")
     >>> SeqIO.write(record_iterator, out_handle, "qual")
     3
@@ -194,7 +201,7 @@ If you wanted to, you could read in this FASTQ file, and save it as a QUAL file:
 You can of course read in a QUAL file, such as the one we just created:
 
     >>> from Bio import SeqIO
-    >>> for record in SeqIO.parse(open("Quality/temp.qual"), "qual"):
+    >>> for record in SeqIO.parse("Quality/temp.qual", "qual"):
     ...     print record.id, record.seq
     EAS54_6_R1_2_1_413_324 ?????????????????????????
     EAS54_6_R1_2_1_540_792 ?????????????????????????
@@ -353,14 +360,13 @@ approximately equal.
 """
 __docformat__ = "epytext en" #Don't just use plain text in epydoc API pages!
 
-#See also http://blog.malde.org/index.php/2008/09/09/the-fastq-file-format-for-sequences/
-
 from Bio.Alphabet import single_letter_alphabet
 from Bio.Seq import Seq, UnknownSeq
 from Bio.SeqRecord import SeqRecord
 from Bio.SeqIO.Interfaces import SequentialSequenceWriter
 from math import log
 import warnings
+
 # define score offsets. See discussion for differences between Sanger and
 # Solexa offsets.
 SANGER_SCORE_OFFSET = 33

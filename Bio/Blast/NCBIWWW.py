@@ -15,12 +15,13 @@ Functions:
 qblast        Do a BLAST search using the QBLAST API.
 """
 
+import sys
 try:
-    import cStringIO as StringIO
+    from cStringIO import StringIO
 except ImportError:
-    import StringIO
+    from StringIO import StringIO
 
-
+from Bio._py3k import _as_string
 
 def qblast(program, database, sequence,
            auto_format=None,composition_based_statistics=None,
@@ -35,7 +36,7 @@ def qblast(program, database, sequence,
            alignments=500,alignment_view=None,descriptions=500,
            entrez_links_new_window=None,expect_low=None,expect_high=None,
            format_entrez_query=None,format_object=None,format_type='XML',
-           ncbi_gi=None,results_file=None,show_overview=None
+           ncbi_gi=None,results_file=None,show_overview=None, megablast=None,
            ):
     """Do a BLAST search using the QBLAST server at NCBI.
 
@@ -53,6 +54,7 @@ def qblast(program, database, sequence,
     format_type    "HTML", "Text", "ASN.1", or "XML".  Def. "XML".
     entrez_query   Entrez query to limit Blast search
     hitlist_size   Number of hits to return. Default 50
+    megablast      TRUE/FALSE whether to use MEga BLAST algorithm (blastn only)
 
     This function does no checking of the validity of the parameters
     and passes the values to the server as is.  More help is available at:
@@ -66,6 +68,7 @@ def qblast(program, database, sequence,
 
     # Format the "Put" command, which sends search requests to qblast.
     # Parameters taken from http://www.ncbi.nlm.nih.gov/BLAST/Doc/node5.html on 9 July 2007
+    # Additional parameters are taken from http://www.ncbi.nlm.nih.gov/BLAST/Doc/node9.html on 8 Oct 2010
     parameters = [
         ('AUTO_FORMAT',auto_format),
         ('COMPOSITION_BASED_STATISTICS',composition_based_statistics),
@@ -81,6 +84,7 @@ def qblast(program, database, sequence,
         ('I_THRESH',i_thresh),
         ('LAYOUT',layout),
         ('LCASE_MASK',lcase_mask),
+        ('MEGABLAST',megablast),
         ('MATRIX_NAME',matrix_name),
         ('NUCL_PENALTY',nucl_penalty),
         ('NUCL_REWARD',nucl_reward),
@@ -88,11 +92,13 @@ def qblast(program, database, sequence,
         ('PERC_IDENT',perc_ident),
         ('PHI_PATTERN',phi_pattern),
         ('PROGRAM',program),
+        #('PSSM',pssm), - It is possible to use PSI-BLAST via this API?
         ('QUERY',sequence),
         ('QUERY_FILE',query_file),
         ('QUERY_BELIEVE_DEFLINE',query_believe_defline),
         ('QUERY_FROM',query_from),
         ('QUERY_TO',query_to),
+        #('RESULTS_FILE',...), - Can we use this parameter?
         ('SEARCHSP_EFF',searchsp_eff),
         ('SERVICE',service),
         ('THRESHOLD',threshold),
@@ -151,7 +157,8 @@ def qblast(program, database, sequence,
                                   message,
                                   {"User-Agent":"BiopythonClient"})
         handle = urllib2.urlopen(request)
-        results = handle.read()
+        results = _as_string(handle.read())
+
         # Can see an "\n\n" page while results are in progress,
         # if so just wait a bit longer...
         if results=="\n\n":
@@ -165,7 +172,7 @@ def qblast(program, database, sequence,
         if status.upper() == "READY":
             break
 
-    return StringIO.StringIO(results)
+    return StringIO(results)
 
 def _parse_qblast_ref_page(handle):
     """Extract a tuple of RID, RTOE from the 'please wait' page (PRIVATE).
@@ -173,7 +180,7 @@ def _parse_qblast_ref_page(handle):
     The NCBI FAQ pages use TOE for 'Time of Execution', so RTOE is proably
     'Request Time of Execution' and RID would be 'Request Identifier'.
     """
-    s = handle.read()
+    s = _as_string(handle.read())
     i = s.find("RID =")
     if i == -1:
         rid = None

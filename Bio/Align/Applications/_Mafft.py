@@ -3,34 +3,54 @@
 # license.  Please see the LICENSE file that should have been included
 # as part of this package.
 """Command line wrapper for the multiple alignment programme MAFFT.
-
-http://align.bmr.kyushu-u.ac.jp/mafft/software/
-
-Citations:
-
-Katoh, Toh (BMC Bioinformatics 9:212, 2008) Improved accuracy of
-multiple ncRNA alignment by incorporating structural information into a
-MAFFT-based framework (describes RNA structural alignment methods)
-
-Katoh, Toh (Briefings in Bioinformatics 9:286-298, 2008) Recent developments in
-the MAFFT multiple sequence alignment program (outlines version 6)
-Katoh, Toh (Bioinformatics 23:372-374, 2007)  Errata PartTree: an algorithm to
-build an approximate tree from a large number of unaligned sequences (describes
-the PartTree algorithm)
-
-Katoh, Kuma, Toh, Miyata (Nucleic Acids Res. 33:511-518, 2005) MAFFT version 5:
-improvement in accuracy of multiple sequence alignment (describes [ancestral
-versions of] the G-INS-i, L-INS-i and E-INS-i strategies) Katoh, Misawa, Kuma,
-Miyata (Nucleic Acids Res. 30:3059-3066, 2002)
-
-Last checked against version: 6.626b (2009/03/16)
 """
+
+#TODO - Remove file exist checks? Other wrappers don't do this, and
+#it prevent things like preparing commands to run on a cluster.
+
 import os
-import types
 from Bio.Application import _Option, _Switch, _Argument, AbstractCommandline
 
 class MafftCommandline(AbstractCommandline):
-    """Command line wrapper for the multiple alignment program MAFFT."""
+    """Command line wrapper for the multiple alignment program MAFFT.
+
+    http://align.bmr.kyushu-u.ac.jp/mafft/software/
+
+    Example:
+
+    >>> from Bio.Align.Applications import MafftCommandline
+    >>> mafft_exe = "/opt/local/mafft"
+    >>> in_file = "../Doc/examples/opuntia.fasta"
+    >>> mafft_cline = MafftCommandline(mafft_exe, input=in_file)
+    >>> print mafft_cline
+    /opt/local/mafft ../Doc/examples/opuntia.fasta
+
+    You would typically run the command line with mafft_cline() or via
+    the Python subprocess module, as described in the Biopython tutorial.
+
+    Citations:
+
+    Katoh, Toh (BMC Bioinformatics 9:212, 2008) Improved accuracy of
+    multiple ncRNA alignment by incorporating structural information into
+    a MAFFT-based framework (describes RNA structural alignment methods)
+
+    Katoh, Toh (Briefings in Bioinformatics 9:286-298, 2008) Recent
+    developments in the MAFFT multiple sequence alignment program
+    (outlines version 6)
+
+    Katoh, Toh (Bioinformatics 23:372-374, 2007)  Errata PartTree: an
+    algorithm to build an approximate tree from a large number of
+    unaligned sequences (describes the PartTree algorithm)
+
+    Katoh, Kuma, Toh, Miyata (Nucleic Acids Res. 33:511-518, 2005) MAFFT
+    version 5: improvement in accuracy of multiple sequence alignment
+    (describes [ancestral versions of] the G-INS-i, L-INS-i and E-INS-i
+    strategies)
+
+    Katoh, Misawa, Kuma, Miyata (Nucleic Acids Res. 30:3059-3066, 2002)
+
+    Last checked against version: MAFFT v6.717b (2009/12/03)
+    """
     def __init__(self, cmd="mafft", **kwargs):
         BLOSUM_MATRICES = ["30","45","62","80"]
         self.parameters = \
@@ -79,20 +99,20 @@ class MafftCommandline(AbstractCommandline):
             #alignments. Valid when either of --blobalpair, --localpair, --
             #genafpair, --fastapair or --blastpair is selected. Default: 2.7
             _Option(["--weighti", "weighti"], ["input"],
-                     lambda x: isinstance(x, types.FloatType), 0,
+                     lambda x: isinstance(x, float), 0,
                      "Weighting factor for the consistency term calculated " + \
                      "from pairwise alignments. Default: 2.7",
                      0),
             #Guide tree is built number times in the progressive stage. Valid
             #with 6mer distance. Default: 2
             _Option(["--retree", "retree"], ["input"],
-                     lambda x: isinstance(x, types.IntType), 0,
+                     lambda x: isinstance(x, int), 0,
                      "Guide tree is built number times in the progressive " + \
                      "stage. Valid with 6mer distance. Default: 2",
                      0),
             #Number cycles of iterative refinement are performed. Default: 0
             _Option(["--maxiterate", "maxiterate"], ["input"],
-                     lambda x: isinstance(x, types.IntType), 0,
+                     lambda x: isinstance(x, int), 0,
                      "Number cycles of iterative refinement are performed. " + \
                      "Default: 0",
                      0),
@@ -137,7 +157,7 @@ class MafftCommandline(AbstractCommandline):
                     "on FASTA. Default: off"),
             #The number of partitions in the PartTree algorithm. Default: 50
             _Option(["--partsize", "partsize"], ["input"],
-                    lambda x: isinstance(x, types.IntType), 0,
+                    lambda x: isinstance(x, int), 0,
                     "The number of partitions in the PartTree algorithm. " + \
                     "Default: 50",
                     0),
@@ -149,49 +169,49 @@ class MafftCommandline(AbstractCommandline):
             #**** Parameter ****
             #Gap opening penalty at group-to-group alignment. Default: 1.53
             _Option(["--op", "op"], ["input"],
-                    lambda x: isinstance(x, types.FloatType), 0,
+                    lambda x: isinstance(x, float), 0,
                     "Gap opening penalty at group-to-group alignment. " + \
                     "Default: 1.53",
                     0),
             #Offset value, which works like gap extension penalty, for group-to-
             #group alignment. Deafult: 0.123
             _Option(["--ep", "ep"], ["input"],
-                    lambda x: isinstance(x, types.FloatType), 0,
+                    lambda x: isinstance(x, float), 0,
                     "Offset value, which works like gap extension penalty, " + \
                     "for group-to- group alignment. Default: 0.123",
                     0),
             #Gap opening penalty at local pairwise alignment. Valid when the --
             #localpair or --genafpair option is selected. Default: -2.00
             _Option(["--lop", "lop"], ["input"],
-                    lambda x: isinstance(x, types.FloatType), 0,
+                    lambda x: isinstance(x, float), 0,
                     "Gap opening penalty at local pairwise alignment. " + \
                     "Default: 0.123",
                     0),
             #Offset value at local pairwise alignment. Valid when the --
             #localpair or --genafpair option is selected. Default: 0.1
             _Option(["--lep", "lep"], ["input"],
-                    lambda x: isinstance(x, types.FloatType), 0,
+                    lambda x: isinstance(x, float), 0,
                     "Offset value at local pairwise alignment. " + \
                     "Default: 0.1",
                     0),
             #Gap extension penalty at local pairwise alignment. Valid when the -
             #-localpair or --genafpair option is selected. Default: -0.1
             _Option(["--lexp", "lexp"], ["input"],
-                    lambda x: isinstance(x, types.FloatType), 0,
+                    lambda x: isinstance(x, float), 0,
                     "Gap extension penalty at local pairwise alignment. " + \
                     "Default: -0.1",
                     0),
             #Gap opening penalty to skip the alignment. Valid when the --
             #genafpair option is selected. Default: -6.00
             _Option(["--LOP", "LOP"], ["input"],
-                    lambda x: isinstance(x, types.FloatType), 0,
+                    lambda x: isinstance(x, float), 0,
                     "Gap opening penalty to skip the alignment. " + \
                     "Default: -6.00",
                     0),
             #Gap extension penalty to skip the alignment. Valid when the --
             #genafpair option is selected. Default: 0.00
             _Option(["--LEXP", "LEXP"], ["input"],
-                    lambda x: isinstance(x, types.FloatType),
+                    lambda x: isinstance(x, float),
                     0,
                     "Gap extension penalty to skip the alignment. " + \
                     "Default: 0.00",
@@ -221,38 +241,42 @@ class MafftCommandline(AbstractCommandline):
             #input. Default: BLOSUM62
             _Option(["--aamatrix", "aamatrix"], ["input"],
                     os.path.exists, 0,
-                    "Use a user-defined AA scoring matrix. " + \
+                    "Use a user-defined AA scoring matrix. "
                     "Default: BLOSUM62",
                     0),
             #Incorporate the AA/nuc composition information into the scoring
             #matrix. Default: off
             _Switch(["--fmodel", "fmodel"], ["input"],
-                    "Incorporate the AA/nuc composition information " + \
-                    "into the scoring matrix. Default: off"),
+                    "Incorporate the AA/nuc composition information into"
+                    "the scoring matrix (True) or not (False, default)"),
             #**** Output ****
             #Output format: clustal format. Default: off (fasta format)
             _Switch(["--clustalout", "clustalout"], ["input"],
-                    "Output format: clustal format. Default: off (fasta" + \
-                    "format)"),
+                    "Output format: clustal (True) or fasta (False, default)"),
             #Output order: same as input. Default: on
             _Switch(["--inputorder", "inputorder"], ["input"],
-                    "Output order: same as input. Default: on"),
+                    "Output order: same as input (True, default) or alignment "
+                    "based (False)"),
             #Output order: aligned. Default: off (inputorder)
             _Switch(["--reorder", "reorder"], ["input"],
-                    "Output order: aligned. Default: off (inputorder)"),
+                    "Output order: aligned (True) or in input order (False, "
+                    "default)"),
             #Guide tree is output to the input.tree file. Default: off
             _Switch(["--treeout", "treeout"], ["input"],
-                    "Guide tree is output to the input.tree file. Default: off"),
+                    "Guide tree is output to the input.tree file (True) or "
+                    "not (False, default)"),
             #Do not report progress. Default: off
             _Switch(["--quiet", "quiet"], ["input"],
-                    "Do not report progress. Default: off"),
+                    "Do not report progress (True) or not (False, default)."),
             #**** Input ****
             #Assume the sequences are nucleotide. Deafult: auto
             _Switch(["--nuc", "nuc"], ["input"],
-                    "Assume the sequences are nucleotide. Default: auto"),
+                    "Assume the sequences are nucleotide (True/False). "
+                    "Default: auto"),
             #Assume the sequences are amino acid. Deafult: auto
             _Switch(["--amino", "amino"], ["input"],
-                    "Assume the sequences are amino acid. Default: auto"),
+                    "Assume the sequences are amino acid (True/False). "
+                    "Default: auto"),
             ###################### SEEDS #####################################
             # MAFFT has multiple --seed commands where the unaligned input is
             # aligned to the seed alignment. There can be multiple seeds in the

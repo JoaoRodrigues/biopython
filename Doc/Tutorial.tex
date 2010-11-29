@@ -79,8 +79,8 @@ Biopython Tutorial and Cookbook}
 \end{latexonly}
 
 \author{Jeff Chang, Brad Chapman, Iddo Friedberg, Thomas Hamelryck, \\
-Michiel de Hoon, Peter Cock, Tiago Antao, Eric Talevich}
-\date{Last Update -- 6 July 2010 (Biopython 1.54+)}
+Michiel de Hoon, Peter Cock, Tiago Antao, Eric Talevich, Bartek Wilczy\'{n}ski}
+\date{Last Update -- 26 November 2010 (Biopython 1.56)}
 
 %Hack to get the logo at the start of the HTML front page:
 %(hopefully this isn't going to be too wide for most people)
@@ -308,6 +308,9 @@ and HTML formats
   
   \item \emph{Where is the} \verb|MultipleSeqAlignment| \emph{object? The} \verb|Bio.Align| \emph{module imports fine but this class isn't there!} \\
   You need Biopython 1.54 or later. Alternatively, the older \verb|Bio.Align.Generic.Alignment| class supports some of its functionality, but using this is now discouraged.
+
+  \item \emph{Why can't I run command line tools directly from the application wrappers?} \\
+  You need Biopython 1.55 or later. Alternatively, use the Python \verb|subprocess| module directly.
   
   \item \emph{I looked in a directory for code, but I couldn't find the code that does something. Where's it hidden?} \\
   One thing to know is that we put code in \verb|__init__.py| files. If you are not used to looking for code in this file this can be confusing. The reason we do this is to make the imports easier for users. For instance, instead of having to do a ``repetitive'' import like \verb|from Bio.GenBank import GenBank|, you can just use \verb|from Bio import GenBank|.
@@ -3821,7 +3824,8 @@ the full path of the tool. For example:
 >>> from Bio.Align.Applications import ClustalwCommandline
 >>> clustalw_exe = r"C:\Program Files\new clustal\clustalw2.exe"
 >>> assert os.path.isfile(clustalw_exe), "Clustal W executable missing"
->>> cline = ClustalwCommandline(clustalw_exe, infile="opuntia.fasta")
+>>> clustalw_cline = ClustalwCommandline(clustalw_exe, infile="opuntia.fasta")
+>>> stdout, stderr = clustalw_cline()
 \end{verbatim}
 
 \noindent Remember, in Python strings \verb|\n| and \verb|\t| are by default
@@ -3829,9 +3833,11 @@ interpreted as a new line and a tab -- which is why we're put a letter
 ``r'' at the start for a raw string that isn't translated in this way.
 This is generally good practice when specifying a Windows style file name.
 
-You can now run this command line, and in Python the recommended way to
-run another program is to use the \verb|subprocess| module. This replaces
-older options like the \verb|os.system()| and the \verb|os.popen*| functions.
+The last line of the example requires Biopython 1.55 or later to run the
+the command line tool via our wrapper object. Internally this uses the
+\verb|subprocess| module which is now the recommended way to run another
+program in Python. This replaces older options like the \verb|os.system()|
+and the \verb|os.popen*| functions.
 
 Now, at this point it helps to know about how command line tools ``work''.
 When you run a tool at the command line, it will often print text output
@@ -3842,53 +3848,16 @@ input, which is any text fed into the tool. These names get shortened
 to stdin, stdout and stderr. When the tool finishes, it has a return
 code (an integer), which by convention is zero for success.
 
-Now let's try an example. Unfortunately there are some subtle differences
-depending on your Operating System (e.g. Windows versus Unix) and how you
-are running Python (e.g. at the command line, or in IDLE). You may see a
-second terminal window appear while ClustalW works. You may see the
-ClustalW output appear at your Python prompt.
-
-First of all, the simple option using \verb|os.system()|,
-
-\begin{verbatim}
->>> import os
->>> return_code = os.system(str(cline))
-...
->>> print return_code
-0
-\end{verbatim}
-
-Now how we'd suggest doing this with the \verb|subprocess| module:
-
-\begin{verbatim}
->>> import sys
->>> import subprocess
->>> return_code = subprocess.call(str(cline), shell=(sys.platform!="win32"))
-...
->>> print return_code
-0
-\end{verbatim}
+When you run the command line tool like this via the Biopython wrapper,
+it will wait for it to finish, and check the return code. If this is
+non zero (indicating an error), an exception is raised. The wrapper
+then returns two strings, stdout and stderr.
 
 In the case of ClustalW, when run at the command line all the important
-output is written directly to the output files. Everything printed to
+output is written directly to the output files. Everything normally printed to
 screen while you wait (via stdout or stderr) is boring and can be
-ignored (assuming it worked).  You can explicitly tell ClustalW to send
-this output to ``dev null'', a kind of black hole for command line tool output:
+ignored (assuming it worked).
 
-\begin{verbatim}
->>> import os
->>> import sys
->>> import subprocess
->>> return_code = subprocess.call(str(cline),
-...                               stdout = open(os.devnull),
-...                               stderr = open(os.devnull),
-...                               shell=(sys.platform!="win32"))
->>> print return_code
-0
-\end{verbatim}
-
-This time ClustalW should be ``quiet'', because all its terminal output
-has been discarded.
 What we care about are the two output files, the alignment and the guide
 tree. We didn't tell ClustalW what filenames to use, but it defaults to
 picking names based on the input file. In this case the output should be
@@ -4013,17 +3982,43 @@ advantage of this to avoid having a temporary output file! For example:
 
 \begin{verbatim}
 >>> from Bio.Align.Applications import MuscleCommandline
->>> cline = MuscleCommandline(input="opuntia.fasta")
->>> print cline
+>>> muscle_cline = MuscleCommandline(input="opuntia.fasta")
+>>> print muscle_cline
 muscle -in opuntia.fasta
 \end{verbatim}
 
-\noindent Now, let's run this and capture the output as handles.
+If we run this via the wrapper, we get back the output as a string. In order
+to parse this we can use \verb|StringIO| to turn it into a handle.
 Remember that MUSCLE defaults to using FASTA as the output format:
 
 \begin{verbatim}
+>>> from Bio.Align.Applications import MuscleCommandline
+>>> muscle_cline = MuscleCommandline(input="opuntia.fasta")
+>>> stdout, stderr = muscle_cline()
+>>> from StringIO import StringIO
+>>> from Bio import AlignIO
+>>> align = AlignIO.read(StringIO(stdout), "fasta")
+>>> print align
+SingleLetterAlphabet() alignment with 7 rows and 906 columns
+TATACATTAAAGGAGGGGGATGCGGATAAATGGAAAGGCGAAAG...AGA gi|6273289|gb|AF191663.1|AF191663
+TATACATTAAAGGAGGGGGATGCGGATAAATGGAAAGGCGAAAG...AGA gi|6273291|gb|AF191665.1|AF191665
+TATACATTAAAGGAGGGGGATGCGGATAAATGGAAAGGCGAAAG...AGA gi|6273290|gb|AF191664.1|AF191664
+TATACATTAAAGAAGGGGGATGCGGATAAATGGAAAGGCGAAAG...AGA gi|6273287|gb|AF191661.1|AF191661
+TATACATAAAAGAAGGGGGATGCGGATAAATGGAAAGGCGAAAG...AGA gi|6273286|gb|AF191660.1|AF191660
+TATACATTAAAGAAGGGGGATGCGGATAAATGGAAAGGCGAAAG...AGA gi|6273285|gb|AF191659.1|AF191659
+TATACATTAAAGAAGGGGGATGCGGATAAATGGAAAGGCGAAAG...AGA gi|6273284|gb|AF191658.1|AF191658
+\end{verbatim}
+
+The above approach is fairly simple, but if you are dealing with very large output
+text the fact that all of stdout and stderr is loaded into memory as a string can
+be a potential drawback. Using the \verb|subprocess| module we can work directly
+with handles instead:
+
+\begin{verbatim}
 >>> import subprocess
->>> child = subprocess.Popen(str(cline),
+>>> from Bio.Align.Applications import MuscleCommandline
+>>> muscle_cline = MuscleCommandline(input="opuntia.fasta")
+>>> child = subprocess.Popen(str(muscle_cline),
 ...                          stdout=subprocess.PIPE,
 ...                          stderr=subprocess.PIPE,
 ...                          shell=(sys.platform!="win32"))
@@ -4060,8 +4055,8 @@ as for the output.
 
 \begin{verbatim}
 >>> from Bio.Align.Applications import MuscleCommandline
->>> cline = MuscleCommandline(clwstrict=True)
->>> print cline
+>>> muscle_cline = MuscleCommandline(clwstrict=True)
+>>> print muscle_cline
 muscle -clwstrict
 \end{verbatim}
 
@@ -4145,9 +4140,9 @@ Let's start by creating a complete \texttt{needle} command line object in one go
 
 \begin{verbatim}
 >>> from Bio.Emboss.Applications import NeedleCommandline
->>> cline = NeedleCommandline(asequence="alpha.faa", bsequence="beta.faa",
-...                           gapopen=10, gapextend=0.5, outfile="needle.txt")
->>> print cline
+>>> needle_cline = NeedleCommandline(asequence="alpha.faa", bsequence="beta.faa",
+...                                  gapopen=10, gapextend=0.5, outfile="needle.txt")
+>>> print needle_cline
 needle -outfile=needle.txt -asequence=alpha.faa -bsequence=beta.faa -gapopen=10 -gapextend=0.5 
 \end{verbatim}
 
@@ -4163,9 +4158,9 @@ the full path to the tool, for example:
 
 \begin{verbatim}
 >>> from Bio.Emboss.Applications import NeedleCommandline
->>> cline = NeedleCommandline(r"C:\EMBOSS\needle.exe",
-...                           asequence="alpha.faa", bsequence="beta.faa",
-...                           gapopen=10, gapextend=0.5, outfile="needle.txt")
+>>> needle_cline = NeedleCommandline(r"C:\EMBOSS\needle.exe",
+...                                  asequence="alpha.faa", bsequence="beta.faa",
+...                                  gapopen=10, gapextend=0.5, outfile="needle.txt")
 \end{verbatim}
 
 \noindent Remember in Python that for a default string \verb|\n| or \verb|\t| means a
@@ -4185,35 +4180,27 @@ Note that you can also specify (or change or look at) the settings like this:
 
 \begin{verbatim}
 >>> from Bio.Emboss.Applications import NeedleCommandline
->>> cline = NeedleCommandline()
->>> cline.asequence="alpha.faa"
->>> cline.bsequence="beta.faa"
->>> cline.gapopen=10
->>> cline.gapextend=0.5
->>> cline.outfile="needle.txt"
->>> print cline
+>>> needle_cline = NeedleCommandline()
+>>> needle_cline.asequence="alpha.faa"
+>>> needle_cline.bsequence="beta.faa"
+>>> needle_cline.gapopen=10
+>>> needle_cline.gapextend=0.5
+>>> needle_cline.outfile="needle.txt"
+>>> print needle_cline
 needle -outfile=needle.txt -asequence=alpha.faa -bsequence=beta.faa -gapopen=10 -gapextend=0.5 
->>> print cline.outfile
+>>> print needle_cline.outfile
 needle.txt
 \end{verbatim}
 
 Next we want to use Python to run this command for us. As explained above,
 for full control, we recommend you use the built in Python \texttt{subprocess}
-module. For simple usage the \texttt{subprocess.call()} wrapper function
-usually suffices:
+module, but for simple usage the wrapper object usually suffices:
 
 \begin{verbatim}
->>> import subprocess
->>> return_code = subprocess.call(str(cline), shell=(sys.platform!="win32"))
+>>> stdout, stderr = needle_cline()
+>>> print stdout + stderr
 Needleman-Wunsch global alignment of two sequences
->>> print return_code
-0
 \end{verbatim}
-
-In the above, all we really care about is that the return code is zero
-(success). If you want to hide the message EMBOSS prints out, then (as
-in the ClustalW example above) send the stdout and stderr to dev null,
-or just set the EMBOSS \texttt{auto} argument to True.
 
 Next we can load the output file with \verb|Bio.AlignIO| as
 discussed earlier in this chapter, as the \texttt{emboss} format:
@@ -4242,7 +4229,6 @@ module (written in C for speed, but with a pure Python fallback available too). 
 doesn't work with alignment objects, so we have not covered it within this chapter.
 See the module's docstring (built in help) for details.
 
-
 \chapter{BLAST}
 \label{chapter:blast}
 Hey, everybody loves BLAST right? I mean, geez, how can get it get any easier to do comparisons between one of your sequences and every other sequence in the known world? But, of course, this section isn't about how cool BLAST is, since we already know that. It is about the problem with BLAST -- it can be really difficult to deal with the volume of data generated by large runs, and to automate BLAST runs in general.
@@ -4268,12 +4254,12 @@ call the online version of BLAST.  This has three non-optional arguments:
 \begin{itemize}
 \item The first argument is the blast program to use for the search, as a
 lower case string. The options and descriptions of the programs are
-available at \url{http://www.ncbi.nlm.nih.gov/BLAST/blast_program.html}.
+available at \url{http://www.ncbi.nlm.nih.gov/BLAST/blast_program.shtml}.
 Currently \verb|qblast| only works with blastn, blastp, blastx, tblast
 and tblastx.
 \item The second argument specifies the databases to search against. Again,
 the options for this are available on the NCBI web pages at
-\url{http://www.ncbi.nlm.nih.gov/BLAST/blast_databases.html}.
+\url{http://www.ncbi.nlm.nih.gov/BLAST/blast_databases.shtml}.
 \item The third argument is a string containing your query sequence.  This
 can either be the sequence itself, the sequence in fasta format,
 or an identifier like a GI number.
@@ -4402,7 +4388,8 @@ Dealing with proprietary or unpublished sequence data can be another reason to r
 locally.  You may not be allowed to redistribute the sequences, so submitting them to the
 NCBI as a BLAST query would not be an option.
 
-Unfortunately, there are some major drawbacks too -- installing all the bits and getting it setup right takes some effort:
+Unfortunately, there are some major drawbacks too -- installing all the bits and getting
+it setup right takes some effort:
 \begin{itemize}
 \item Local BLAST requires command line tools to be installed.
 \item Local BLAST requires (large) BLAST databases to be setup (and potentially kept up to date).
@@ -4442,8 +4429,7 @@ This section will show briefly how to use these tools from within Python. If you
 already read or tried the alignment tool examples in Section~\ref{sec:alignment-tools}
 this should all seem quite straightforward. First, we construct a command line string
 (as you would type in at the command line prompt if running standalone BLAST by hand).
-Then we can execute this command from within Python, typically using the
-\verb|subprocess| module.
+Then we can execute this command from within Python.
 
 For example, taking a FASTA file of gene nucleotide sequences, you might want to
 run a BLASTX (translation) search against the non-redundant (NR) protein database.
@@ -4460,35 +4446,26 @@ On my computer this takes about six minutes - a good reason to save the output
 to a file so you and repeat any analysis as needed.
 
 From within Biopython we can use the NCBI BLASTX wrapper from the
-\verb|Bio.Blast.Applications| module to build the command line string:
+\verb|Bio.Blast.Applications| module to build the command line string,
+and run it:
 
 \begin{verbatim}
 >>> from Bio.Blast.Applications import NcbiblastxCommandline
 >>> help(NcbiblastxCommandline)
 ...
->>> cline = NcbiblastxCommandline(query="opuntia.fasta", db="nr", evalue=0.001, outfmt=5,
-... out="opuntia.xml")
->>> cline
+>>> blastx_cline = NcbiblastxCommandline(query="opuntia.fasta", db="nr", evalue=0.001,
+...                                      outfmt=5, out="opuntia.xml")
+>>> blastx_cline
 NcbiblastxCommandline(cmd='blastx', query='opuntia.fasta', db='nr', out='opuntia.xml',
 evalue=0.001, outfmt=5)
->>> print cline
+>>> print blastx_cline
 blastx -query opuntia.fasta -db nr -out opuntia.xml -evalue 0.001 -outfmt 5
+>>> stdout, stderr = blastx_cline()
 \end{verbatim}
 
-In this example there shouldn't be any output from BLASTX to the terminal
-(stdout or stderr), so we can call the tool like this:
-
-\begin{verbatim}
->>> import sys
->>> import subprocess
->>> return_code = subprocess.call(str(cline), shell=(sys.platform!="win32"))
-...
->>> print return_code
-0
-\end{verbatim}
-\noindent Here the \ldots means wait for the command to finish. We then check
-the return code, remember that zero usually means no errors. You could also
-check the output file \verb|opuntia.xml| has been created.
+In this example there shouldn't be any output from BLASTX to the terminal,
+so stdout and stderr should be empty. You may want to check the output file
+\verb|opuntia.xml| has been created.
 
 As you may recall from earlier examples in the tutorial, the \verb|opuntia.fasta|
 contains seven sequences, so the BLAST XML output should contain multiple results.
@@ -4927,9 +4904,7 @@ For the DOM and SAX parsers, see the Python documentation. The parser in \verb+B
 
 NCBI uses DTD (Document Type Definition) files to describe the structure of the information contained in XML files. Most of the DTD files used by NCBI are included in the Biopython distribution. The \verb+Bio.Entrez+ parser makes use of the DTD files when parsing an XML file returned by NCBI Entrez.
 
-Occasionally, you may find that the DTD file associated with a specific XML file is missing in the Biopython distribution. In particular, this may happen when NCBI updates its DTD files. If this happens, \verb+Entrez.read+ will give an error message showing which DTD file is missing.
-You can download the DTD file from NCBI; most can be found at \url{http://www.ncbi.nlm.nih.gov/dtd/} or \url{http://eutils.ncbi.nlm.nih.gov/entrez/query/DTD/}.
-After downloading, the DTD file should be stored in the directory \verb+...site-packages/Bio/Entrez/DTDs+, containing the other DTD files.  Alternatively, if you installed Biopython from source, you can add the DTD file to the source code's \verb+Bio/Entrez/DTDs+ directory, and reinstall Biopython. This will install the new DTD file in the correct location together with the other DTD files.
+Occasionally, you may find that the DTD file associated with a specific XML file is missing in the Biopython distribution. In particular, this may happen when NCBI updates its DTD files. If this happens, \verb+Entrez.read+ will show a warning message with the name and URL of the missing DTD file. The parser will proceed to access the missing DTD file through the internet, allowing the parsing of the XML file to continue.  However, the parser is much faster if the DTD file is available locally. For this purpose, please download the DTD file from the URL in the warning message and place it in the directory \verb+...site-packages/Bio/Entrez/DTDs+, containing the other DTD files.  If you don't have write access to this directory, you can also place the DTD file in \verb+~/.biopython/Bio/Entrez/DTDs+, where \verb+~+ represents your home directory, Alternatively, if you installed Biopython from source, you can add the DTD file to the source code's \verb+Bio/Entrez/DTDs+ directory, and reinstall Biopython. This will install the new DTD file in the correct location together with the other DTD files.
 
 The Entrez Programming Utilities can also generate output in other formats, such as the Fasta or GenBank file formats for sequence databases, or the MedLine format for the literature database, discussed in Section~\ref{sec:entrez-specialized-parsers}.
 
@@ -5157,12 +5132,12 @@ Let's look at a simple example to see how EPost works -- uploading some PubMed i
 \noindent The returned XML includes two important strings, \verb|QueryKey| and \verb|WebEnv| which together define your history session.
 You would extract these values for use with another Entrez call such as EFetch:
 \begin{verbatim}
-from Bio import Entrez
-Entrez.email = "A.N.Other@example.com"     # Always tell NCBI who you are
-id_list = ["19304878", "18606172", "16403221", "16377612", "14871861", "14630660"]
-search_results = Entrez.read(Entrez.epost("pubmed", id=",".join(id_list)))
-webenv = search_results["WebEnv"]
-query_key = search_results["QueryKey"] 
+>>> from Bio import Entrez
+>>> Entrez.email = "A.N.Other@example.com"     # Always tell NCBI who you are
+>>> id_list = ["19304878", "18606172", "16403221", "16377612", "14871861", "14630660"]
+>>> search_results = Entrez.read(Entrez.epost("pubmed", id=",".join(id_list)))
+>>> webenv = search_results["WebEnv"]
+>>> query_key = search_results["QueryKey"] 
 \end{verbatim}
 \noindent Section~\ref{sec:entrez-webenv} shows how to use the history feature.
 
@@ -5299,7 +5274,7 @@ from Bio import Entrez
 Entrez.email = "A.N.Other@example.com"     # Always tell NCBI who you are
 filename = "gi_186972394.gbk"
 if not os.path.isfile(filename):
-    print "Downloading..."
+    # Downloading...
     net_handle = Entrez.efetch(db="nucleotide",id="186972394",rettype="gb")
     out_handle = open(filename, "w")
     out_handle.write(net_handle.read())
@@ -5483,6 +5458,120 @@ This will print:
 17 AAVS1
 ...
 \end{verbatim}
+
+
+\section{Handling errors}
+
+Three things can go wrong when parsing an XML file:
+\begin{itemize}
+\item The file may not be an XML file to begin with;
+\item The file may end prematurely or otherwise be corrupted;
+\item The file may be correct XML, but contain items that are not represented in the associated DTD.
+\end{itemize}
+
+The first case occurs if, for example, you try to parse a Fasta file as if it were an XML file:
+\begin{verbatim}
+>>> from Bio import Entrez
+>>> handle = open("NC_005816.fna") # a Fasta file
+>>> record = Entrez.read(handle)
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+  File "/usr/local/lib/python2.7/site-packages/Bio/Entrez/__init__.py", line 257, in read
+    record = handler.read(handle)
+  File "/usr/local/lib/python2.7/site-packages/Bio/Entrez/Parser.py", line 164, in read
+    raise NotXMLError(e)
+Bio.Entrez.Parser.NotXMLError: Failed to parse the XML data (syntax error: line 1, column 0). Please make sure that the input data are in XML format.
+\end{verbatim}
+Here, the parser didn't find the \verb|<?xml ...| tag with which an XML file is supposed to start, and therefore decides (correctly) that the file is not an XML file.
+
+When your file is in the XML format but is corrupted (for example, by ending prematurely), the parser will raise a CorruptedXMLError.
+Here is an example of an XML file that ends prematurely:
+\begin{verbatim}
+<?xml version="1.0"?>
+<!DOCTYPE eInfoResult PUBLIC "-//NLM//DTD eInfoResult, 11 May 2002//EN" "http://www.ncbi.nlm.nih.gov/entrez/query/DTD/eInfo_020511.dtd">
+<eInfoResult>
+<DbList>
+        <DbName>pubmed</DbName>
+        <DbName>protein</DbName>
+        <DbName>nucleotide</DbName>
+        <DbName>nuccore</DbName>
+        <DbName>nucgss</DbName>
+        <DbName>nucest</DbName>
+        <DbName>structure</DbName>
+        <DbName>genome</DbName>
+        <DbName>books</DbName>
+        <DbName>cancerchromosomes</DbName>
+        <DbName>cdd</DbName>
+\end{verbatim}
+which will generate the following traceback:
+\begin{verbatim}
+>>> Entrez.read(handle)
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+  File "/usr/local/lib/python2.7/site-packages/Bio/Entrez/__init__.py", line 257, in read
+    record = handler.read(handle)
+  File "/usr/local/lib/python2.7/site-packages/Bio/Entrez/Parser.py", line 160, in read
+    raise CorruptedXMLError(e)
+Bio.Entrez.Parser.CorruptedXMLError: Failed to parse the XML data (no element found: line 16, column 0). Please make sure that the input data are not corrupted.
+
+>>>
+\end{verbatim}
+Note that the error message tells you at what point in the XML file the error was detected.
+
+The third type of error occurs if the XML file contains tags that do not have a description in the corresponding DTD file. This is an example of such an XML file:
+
+\begin{verbatim}
+<?xml version="1.0"?>
+<!DOCTYPE eInfoResult PUBLIC "-//NLM//DTD eInfoResult, 11 May 2002//EN" "http://www.ncbi.nlm.nih.gov/entrez/query/DTD/eInfo_020511.dtd">
+<eInfoResult>
+        <DbInfo>
+        <DbName>pubmed</DbName>
+        <MenuName>PubMed</MenuName>
+        <Description>PubMed bibliographic record</Description>
+        <Count>20161961</Count>
+        <LastUpdate>2010/09/10 04:52</LastUpdate>
+        <FieldList>
+                <Field>
+...
+                </Field>
+        </FieldList>
+        <DocsumList>
+                <Docsum>
+                        <DsName>PubDate</DsName>
+                        <DsType>4</DsType>
+                        <DsTypeName>string</DsTypeName>
+                </Docsum>
+                <Docsum>
+                        <DsName>EPubDate</DsName>
+...
+        </DbInfo>
+</eInfoResult>
+\end{verbatim}
+
+In this file, for some reason the tag \verb|<DocsumList>| (and several others) are not listed in the DTD file \verb|eInfo_020511.dtd|, which is specified on the second line as the DTD for this XML file. By default, the parser will stop and raise a ValidationError if it cannot find some tag in the DTD:
+
+\begin{verbatim}
+>>> from Bio import Entrez
+>>> handle = open("einfo3.xml")
+>>> record = Entrez.read(handle)
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+  File "/usr/local/lib/python2.7/site-packages/Bio/Entrez/__init__.py", line 257, in read
+    record = handler.read(handle)
+  File "/usr/local/lib/python2.7/site-packages/Bio/Entrez/Parser.py", line 154, in read
+    self.parser.ParseFile(handle)
+  File "/usr/local/lib/python2.7/site-packages/Bio/Entrez/Parser.py", line 246, in startElementHandler
+    raise ValidationError(name)
+Bio.Entrez.Parser.ValidationError: Failed to find tag 'DocsumList' in the DTD. To skip all tags that are not represented in the DTD, please call Bio.Entrez.read or Bio.Entrez.parse with validate=False.
+\end{verbatim}
+Optionally, you can instruct the parser to skip such tags instead of raising a ValidationError. This is done by calling \verb|Entrez.read| or \verb|Entrez.parse| with the argument \verb|validate| equal to False:
+\begin{verbatim}
+>>> from Bio import Entrez
+>>> handle = open("einfo3.xml")
+>>> record = Entrez.read(handle,validate=False)
+>>>
+\end{verbatim}
+Of course, the information contained in the XML tags that are not in the DTD are not present in the record returned by \verb|Entrez.read|.
 
 
 \section{Specialized parsers}
@@ -6094,7 +6183,7 @@ additional argument of \verb|usehistory="y"|,
 
 Having stored these values in variables {\tt session\_cookie} and {\tt query\_key} we can use them as parameters to \verb|Bio.Entrez.efetch()| instead of giving the GI numbers as identifiers.  
 
-While for small searches you might be OK downloading everything at once, its better download in batches.  You use the {\tt retstart} and {\tt retmax} parameters to specify which range of search results you want returned (starting entry using zero-based counting, and maximum number of results to return).  For example,
+While for small searches you might be OK downloading everything at once, it is better to download in batches.  You use the {\tt retstart} and {\tt retmax} parameters to specify which range of search results you want returned (starting entry using zero-based counting, and maximum number of results to return).  For example,
 
 \begin{verbatim}
 batch_size = 3
@@ -6131,7 +6220,8 @@ out_handle = open("recent_orchid_papers.txt", "w")
 for start in range(0,count,batch_size):
     end = min(count, start+batch_size)
     print "Going to download record %i to %i" % (start+1, end)
-    fetch_handle = Entrez.efetch(db="pubmed", rettype="medline",
+    fetch_handle = Entrez.efetch(db="pubmed",
+                                 rettype="medline", retmode="text",
                                  retstart=start, retmax=batch_size,
                                  webenv=search_results["WebEnv"],
                                  query_key=search_results["QueryKey"])
@@ -7860,14 +7950,276 @@ like $F_{st}$, or allele counts.
 \chapter{Phylogenetics with Bio.Phylo}
 \label{sec:Phylo}
 
-Phylo is a new module in Biopython 1.54. Following the lead of SeqIO and AlignIO, 
+The Bio.Phylo module was introduced in Biopython 1.54. Following the lead of SeqIO and AlignIO,
 it aims to provide a common way to work with phylogenetic data independently of the source data
 format, as well as a consistent API for I/O operations.
 
-{\em Note:} Since Phylo is a recent addition to Biopython, we anticipate parts of it may change
-in backwards-incompatible ways in future releases --- we'll try our best to avoid it, though.
+{\em Note:} Since Phylo is a relatively recent addition to Biopython, we anticipate parts of it
+may change in backwards-incompatible ways in future releases --- we'll try our best to avoid
+it, though.
 
-\section{Basic I/O}
+\section{Demo: What's in a Tree?}
+
+To get acquainted with the module, let's start with a tree that we've already constructed, and
+inspect it a few different ways.  Then we'll colorize the branches, to use a special phyloXML
+feature, and finally save it.
+
+In a terminal, create a simple Newick file using your favorite text editor:
+
+\begin{verbatim}
+% cat > simple.dnd <<EOF
+> (((A,B),(C,D)),(E,F,G));
+> EOF
+\end{verbatim}
+
+This tree has no branch lengths, only a topology and labelled terminals. (If you have a real
+tree file available, you can follow this demo using that instead.)
+
+Launch the Python interpreter of your choice:
+
+\begin{verbatim}
+% ipython -pylab
+\end{verbatim}
+
+For interactive work, launching the IPython interpreter with the \verb|-pylab| flag enables
+\textbf{matplotlib} integration, so graphics will pop up automatically. We'll use that during
+this demo.
+
+Now, within Python, read the tree file, giving the file name and the name of the format.
+
+\begin{verbatim}
+>>> from Bio import Phylo
+>>> tree = Phylo.read("simple.dnd", "newick")
+\end{verbatim}
+
+Printing the tree object as a string gives us a look at the entire object hierarchy.
+
+\begin{verbatim}
+>>> print tree
+
+Tree(weight=1.0, rooted=False, name="")
+    Clade(branch_length=1.0)
+        Clade(branch_length=1.0)
+            Clade(branch_length=1.0)
+                Clade(branch_length=1.0, name="A")
+                Clade(branch_length=1.0, name="B")
+            Clade(branch_length=1.0)
+                Clade(branch_length=1.0, name="C")
+                Clade(branch_length=1.0, name="D")
+        Clade(branch_length=1.0)
+            Clade(branch_length=1.0, name="E")
+            Clade(branch_length=1.0, name="F")
+            Clade(branch_length=1.0, name="G")
+\end{verbatim}
+
+The \texttt{Tree} object contains global information about the tree, such as whether it's
+rooted or unrooted. It has one root clade, and under that, it's nested lists of clades all the
+way down to the tips.
+
+The function \verb|draw_ascii| creates a simple ASCII-art (plain text) dendrogram.  This is a
+convenient visualization for interactive exploration, in case better graphical tools aren't
+available.
+
+\begin{verbatim}
+>>> Phylo.draw_ascii(tree)
+                                                    ________________________ A
+                           ________________________|
+                          |                        |________________________ B
+  ________________________|
+ |                        |                         ________________________ C
+ |                        |________________________|
+_|                                                 |________________________ D
+ |
+ |                         ________________________ E
+ |                        |
+ |________________________|________________________ F
+                          |
+                          |________________________ G
+
+\end{verbatim}
+
+If you have \textbf{matplotlib}, \textbf{NetworkX}, \textbf{PyGraphviz} and \textbf{Graphviz}
+installed, you can create a graphic using the \verb|draw_graphviz| function, named after the
+corresponding function in NetworkX:
+
+\begin{verbatim}
+>>> tree.rooted = True
+>>> Phylo.draw_graphiz(tree)
+\end{verbatim}
+
+This exports the tree object to a NetworkX graph, uses Graphviz to lay out the nodes, and
+displays it using matplotlib. There are a number of keyword arguments that can modify the
+resulting diagram, as described later in this chapter.
+
+\textit{Note:} If you're not using IPython with the \verb|-pylab| option, to display or save
+the figure, call the appropriate library function in PyLab or matplotlib:
+
+\begin{verbatim}
+>>> import pylab
+>>> pylab.show()
+\end{verbatim}
+
+
+\begin{htmlonly}
+\imgsrc[width=432, height=368]{images/phylo-rooted.png}
+\label{fig:phylo-rooted}
+\end{htmlonly}
+
+\begin{latexonly}
+\begin{figure}[htb]
+\centering
+\includegraphics[width=0.5\textwidth]{images/phylo-rooted.png}
+\caption{A rooted tree drawn with {\tt draw\_graphviz}.}
+\label{fig:phylo-rooted}
+\end{figure}
+\end{latexonly}
+
+The difference between rooted and unrooted trees here is whether it shows the direction on
+branches. Since we rooted the tree, we can see the root must be along the branch with two
+``heads''.
+
+
+\subsection{Coloring branches with PhyloXML}
+
+The PhyloXML specification allows assigning 24-bit color values to clades within a phylogeny.
+In order to colorize our tree, and later save those attributes along with the tree topology, we
+convert to a subclass of the basic tree object called Phylogeny, from the Bio.Phylo.PhyloXML
+module.
+
+In Biopython 1.55 and later, this is a convenient tree method:
+
+\begin{verbatim}
+>>> phy = tree.as_phyloxml()
+\end{verbatim}
+
+In Biopython 1.54, we can accomplish the same thing with one extra import:
+
+\begin{verbatim}
+>>> from Bio.Phylo.PhyloXML import Phylogeny
+>>> phy = Phylogeny.from_tree(tree)
+\end{verbatim}
+
+The object hierarchy still looks and behaves similarly:
+
+\begin{verbatim}
+>>> print phy
+
+Phylogeny(rooted=True, name="")
+    Clade(branch_length=1.0)
+        Clade(branch_length=1.0)
+            Clade(branch_length=1.0)
+                Clade(branch_length=1.0, name="A")
+                Clade(branch_length=1.0, name="B")
+            Clade(branch_length=1.0)
+                Clade(branch_length=1.0, name="C")
+                Clade(branch_length=1.0, name="D")
+        Clade(branch_length=1.0)
+            Clade(branch_length=1.0, name="E")
+            Clade(branch_length=1.0, name="F")
+            Clade(branch_length=1.0, name="G")
+\end{verbatim}
+
+Now we can begin assigning colors.
+
+First, color the root clade gray.  We can do that by assigning an RGB triple, an HTML-style
+hex string, or the name of one of the predefined colors.
+
+\begin{verbatim}
+>>> phy.root.color = (128, 128, 128)
+\end{verbatim}
+
+Or:
+
+\begin{verbatim}
+>>> phy.root.color = "#808080"
+\end{verbatim}
+
+Or:
+
+\begin{verbatim}
+>>> phy.root.color = "gray"
+\end{verbatim}
+
+Colors for a clade are treated as cascading down through the entire clade, so when we colorize
+the root here, it turns the whole tree gray.  We can override that by assigning a different
+color lower down on the tree.
+
+Let's target the most recent common ancestor (MRCA) of the nodes named ``E'' and ``F''.  The
+\verb|common_ancestor| method returns a reference to that clade in the original tree, so when
+we color that clade ``salmon'', the color will show up in the original tree.
+
+\begin{verbatim}
+>>> mrca = phy.common_ancestor({"name": "E"}, {"name": "F"})
+>>> mrca.color = "salmon"
+\end{verbatim}
+
+If we happend to know exactly where a certain clade is in the tree, in terms of nested list
+entries, we can jump directly to that position in the tree by indexing it.  Here, the index
+\verb|[0,1]| refers to the second child of the first child of the root.
+
+\begin{verbatim}
+>>> phy.clade[0,1].color = "blue"
+\end{verbatim}
+
+Finally, show our work --- using a different Graphviz engine for a slightly prettier layout.
+
+\begin{verbatim}
+>>> Phylo.draw_graphviz(phy, prog="neato")
+\end{verbatim}
+
+
+\begin{htmlonly}
+\imgsrc[width=499, height=348]{images/phylo-color.png}
+\label{fig:phylo-color}
+\end{htmlonly}
+
+\begin{latexonly}
+\begin{figure}[htb]
+\centering
+\includegraphics[width=0.6\textwidth]{images/phylo-color.png}
+\caption{A colorized tree drawn with {\tt draw\_graphviz}, using {\tt neato} for node layout.}
+\label{fig:phylo-color}
+\end{figure}
+\end{latexonly}
+
+Note that a clade's color includes the branch leading to that clade, as well as its
+descendents. The common ancestor of E and F turns out to be just under the root, and with this
+coloring we can see exactly where the root of the tree is.
+
+My, we've accomplished a lot! Let's take a break here and save our work.  Call the
+\texttt{write} function with a file name or handle --- here we use standard output, to see what
+would be written --- and the format \texttt{phyloxml}.  PhyloXML saves the colors we assigned,
+so you can open this phyloXML file in another tree viewer like Archaeopteryx, and the colors
+will show up there, too.
+
+\begin{verbatim}
+>>> import sys
+>>> Phylo.write(phy, sys.stdout, "phyloxml")
+
+<phy:phyloxml xmlns:phy="http://www.phyloxml.org">
+  <phy:phylogeny rooted="true">
+    <phy:clade>
+      <phy:branch_length>1.0</phy:branch_length>
+      <phy:color>
+        <phy:red>128</phy:red>
+        <phy:green>128</phy:green>
+        <phy:blue>128</phy:blue>
+      </phy:color>
+      <phy:clade>
+        <phy:branch_length>1.0</phy:branch_length>
+        <phy:clade>
+          <phy:branch_length>1.0</phy:branch_length>
+          <phy:clade>
+            <phy:name>A</phy:name>
+            ...
+\end{verbatim}
+
+The rest of this chapter covers the core functionality of Bio.Phylo in greater detail. For more
+examples of using Bio.Phylo, see the cookbook page on Biopython.org:
+
+\url{http://biopython.org/wiki/Phylo_cookbook}
+
+\section{I/O functions}
 
 Like SeqIO and AlignIO, Phylo handles file input and output through four functions:
 \verb|parse|, \verb|read|, \verb|write| and \verb|convert|.
@@ -7877,17 +8229,20 @@ will raise an error if the file contains more than one tree, or no trees.
 
 \begin{verbatim}
 >>> from Bio import Phylo
->>> tree = Phylo.read("example.xml", "phyloxml")
+>>> tree = Phylo.read("Tests/Nexus/int_node_labels.nwk", "newick")
 >>> print tree
 \end{verbatim}
 
-(Example files are available in the \texttt{Tests/PhyloXML/} directory of the Biopython distribution.)
+(Example files are available in the \texttt{Tests/Nexus/} and \texttt{Tests/PhyloXML/}
+directories of the Biopython distribution.)
 
 To handle multiple (or an unknown number of) trees, use the \verb|parse| function iterates
 through each of the trees in the given file: 
 
 \begin{verbatim}
->>> trees = Phylo.parse("example.xml", "phyloxml")
+>>> trees = Phylo.parse("Tests/PhyloXML/phyloxml_examples.xml", "phyloxml")
+>>> for tree in trees:
+...     print tree
 \end{verbatim}
 
 Write a tree or iterable of trees back to file with the \verb|write| function:
@@ -7909,6 +8264,15 @@ Convert files between any of the supported formats with the \verb|convert| funct
 1
 >>> Phylo.convert("other_trees.xml", "phyloxml", "other_trees.nex", 'nexus")
 12
+\end{verbatim}
+
+To use strings as input or output instead of actual files, use \verb|StringIO| as you would
+with SeqIO and AlignIO:
+
+\begin{verbatim}
+>>> from StringIO import StringIO
+>>> handle = StringIO("(((A,B),(C,D)),(E,F,G));")
+>>> tree = Phylo.read(handle, "newick")
 \end{verbatim}
 
 
@@ -8057,6 +8421,9 @@ returned during iteration. The first argument can be any of the following types:
   \item A \textbf{TreeElement instance}, which tree elements will match by identity --- so
     searching with a Clade instance as the target will find that clade in the tree;
 
+  \item A \textbf{string}, which matches tree elements' string representation --- in
+    particular, a clade's \verb|name| \textit{(added in Biopython 1.56)};
+
   \item A \textbf{class} or \textbf{type}, where every tree element of the same type (or
     sub-type) will be matched;
 
@@ -8118,6 +8485,8 @@ attribute found. If no keyword arguments are given, then any TreeElement types a
 The code for this is generally shorter than passing a dictionary as the target specification:
 \verb|tree.find_clades({"name": "Foo1"})| can be shortened to
 \verb|tree.find_clades(name="Foo1")|.
+
+(In Biopython 1.56 or later, this can be even shorter: \verb|tree.find_clades("Foo1")|)
 
 % TODO -- introduce these / segue and clean up the descriptions
 
@@ -8244,6 +8613,18 @@ newtree = copy.deepcopy(tree)
     will be collapsed and its branch length added to remaining terminal node. This might no
     longer be a meaningful value.
 
+  \item[\texttt{root\_with\_outgroup}]
+    Reroot this tree with the outgroup clade containing the given targets, i.e. the common
+    ancestor of the outgroup. This method is only available on Tree objects, not Clades.
+
+    If the outgroup is identical to self.root, no change occurs. If the outgroup clade is
+    terminal (e.g. a single terminal node is given as the outgroup), a new bifurcating root
+    clade is created with a 0-length branch to the given outgroup. Otherwise, the internal node
+    at the base of the outgroup becomes a trifurcating root for the whole tree. If the original
+    root was bifurcating, it is dropped from the tree.
+
+    In all cases, the total branch length of the tree stays the same.
+
   \item[\texttt{split}]
     Generate \textit{n} (default 2) new descendants. In a species tree, this is a speciation
     event.  New clades have the given \verb|branch_length| and the same name as this clade's
@@ -8273,30 +8654,554 @@ See the PhyloXML page on the Biopython wiki (\url{http://biopython.org/wiki/Phyl
 descriptions and examples of using the additional annotation features provided by PhyloXML.
 
 
-\section{Acknowledgements and future directions}
+\section{Future plans}
 \label{sec:PhyloFuture}
 
-Much of this module was written during Google Summer of Code 2009, under the auspices of
-NESCent, as a project to implement Python support for the phyloXML data format (see
-\ref{sec:PhyloXML}). Support for Newick and Nexus formats was added by porting part of the
-existing Bio.Nexus module to the new classes used by Bio.Phylo.
+Bio.Phylo is under active development. Here's a quick survey of what we might change in future
+releases:
 
-Currently, Bio.Nexus contains some useful features that have not yet been ported to Bio.Phylo
-classes. If you find some functionality lacking in Bio.Phylo, try poking throught Bio.Nexus to
-see if it's there instead.
+\begin{description}
+  \item[New methods] 
+    Generally useful functions for operating on Tree or Clade objects appear on the Biopython
+    wiki first, so that casual users can test them and decide if they're useful before we add
+    them to Bio.Phylo:
 
-Within the next few releases, we intend to add support for another file format, NeXML. This is
-unlikely to change the basic object hierarchy substantially, but could inspire some 
-additions to the attributes of existing classes.
+    \url{http://biopython.org/wiki/Phylo_cookbook}
 
-The string representations of Phylo objects are also likely to change in the next release;
-we're still determining which ``informal'' representations are most useful most often. To
-future-proof your code against this, we recommend using the attributes of objects directly
-(e.g. \verb|my_clade.name|) rather than automatic string conversion (\verb|str(my_clade)|) in
-scripts that require a consistent result.
+  \item[Bio.Nexus port]
+    Much of this module was written during Google Summer of Code 2009, under the auspices of
+    NESCent, as a project to implement Python support for the phyloXML data format (see
+    \ref{sec:PhyloXML}). Support for Newick and Nexus formats was added by porting part of the
+    existing Bio.Nexus module to the new classes used by Bio.Phylo.
+
+    Currently, Bio.Nexus contains some useful features that have not yet been ported to
+    Bio.Phylo classes --- notably, calculating a consensus tree. If you find some functionality
+    lacking in Bio.Phylo, try poking throught Bio.Nexus to see if it's there instead.
+
+  \item[NeXML support]  
+    Within the next few releases, we intend to add support for another file format, NeXML. This
+    is unlikely to change the basic object hierarchy substantially, but could inspire some
+    additions to the attributes of existing classes.
+
+  \item[String representations] 
+    The string representations of Phylo objects might also change in future releases; we're
+    still determining which ``informal'' representations are most useful most often. To
+    future-proof your code against this, we recommend using the attributes of objects directly
+    (e.g.  \verb|my_clade.name|) rather than automatic string conversion (\verb|str(my_clade)|)
+    in scripts that require a consistent result.
+
+\end{description}
 
 We're open to any suggestions for improving the functionality and usability of this module;
 just let us know on the mailing list or Bugzilla.
+
+\chapter{Sequence motif analysis using Bio.Motif}
+\label{chap:bio_motif}
+
+This chapter gives an overview of the functionality of the
+\verb|Bio.Motif| package included in Biopython distribution. It is intended
+for people who are involved in analysis of sequence motif, so I'll
+assume that you are familiar with basic notions of motif analysis. In
+case something is unclear, please look into Section~\ref{sec:links}
+for some relevant links.
+
+It should be also noted, that \verb|Bio.Motif| was based on two
+former Biopython modules, \verb|Bio.AlignAce| and \verb|Bio.MEME|. It provides
+ most of their functionality with a unified motif object implementation.
+
+Speaking of other libraries, if you are reading this you might be
+interested in the \href{http://fraenkel.mit.edu/TAMO/}{TAMO}, another python library
+designed to deal with sequence motifs. It supports more \emph{de-novo}
+motif finders, but it is not a part of Biopython and has some restrictions
+on commercial use.
+
+\section{Motif objects}
+\label{sec:object}
+Since we are interested in motif analysis, we need to take a look at
+\verb|Motif| objects in the first place. For that we need to import 
+the Motif library:
+\begin{verbatim}
+from Bio import Motif
+\end{verbatim}
+and we can start creating our first motif objects. Let's create a DNA motif:
+\begin{verbatim}
+from Bio.Alphabet import IUPAC
+m=Motif.Motif(alphabet=IUPAC.unambiguous_dna)
+\end{verbatim}
+This is for now just an empty container, so let's add some sequences to our newly created motif:
+\begin{verbatim}
+from Bio.Seq import Seq
+m.add_instance(Seq("TATAA",m.alphabet))
+m.add_instance(Seq("TATTA",m.alphabet))
+m.add_instance(Seq("TATAA",m.alphabet))
+m.add_instance(Seq("TATAA",m.alphabet))
+\end{verbatim}
+Now we have a full \verb|Motif| instance, so we can try to get some
+basic information about it. Let's start with length and consensus
+sequence:
+\begin{verbatim}
+>>> len(m)
+5
+>>> m.consensus()
+Seq('TATAA', IUPACUnambiguousDNA())
+\end{verbatim}
+In case of DNA motifs, we can also get a reverse complement of a motif:
+\begin{verbatim}
+>>> m.reverse_complement()
+<Bio.Motif.Motif.Motif object at 0xb39890>
+>>> m.reverse_complement().consensus()
+Seq('TTATA', IUPACUnambiguousDNA())
+>>> m.reverse_complement().instances  
+[Seq('TTATA', IUPACUnambiguousDNA()), 
+ Seq('TAATA', IUPACUnambiguousDNA()), 
+ Seq('TTATA', IUPACUnambiguousDNA()), 
+ Seq('TTATA', IUPACUnambiguousDNA())]
+\end{verbatim}
+
+We can also calculate the information content of a motif with a simple call:
+\begin{verbatim}
+>>> m.ic()
+5.2735010263278932
+\end{verbatim}
+This gives us a number of bits of information provided by the motif,
+which tells us how much differs from background.
+
+The most common representation of a motif is a PWM (Position Weight
+Matrix). It summarizes the probabilities of finding any symbol (in
+this case nucleotide) in any position of a motif. It can be computed by calling the \verb|.pwm()| method:
+\begin{verbatim}
+>>> m.pwm()
+[{'A': 0.05, 'C': 0.05, 'T': 0.85, 'G': 0.05}, 
+ {'A': 0.85, 'C': 0.05, 'T': 0.05, 'G': 0.05}, 
+ {'A': 0.05, 'C': 0.05, 'T': 0.85, 'G': 0.05}, 
+ {'A': 0.65, 'C': 0.05, 'T': 0.25, 'G': 0.05}, 
+ {'A': 0.85, 'C': 0.05, 'T': 0.05, 'G': 0.05}]
+\end{verbatim}
+The probabilities in the motif's PWM are based on the counts in the
+instances, but we can see, that even though there were no Gs and no Cs
+in the instances, we still have non-zero probabilities assigned to
+them. These come from pseudo-counts which are, roughly speaking, a
+commonly used way to acknowledge the incompleteness of our knowledge
+and avoid technical problems with calculating logarithms of $0$.
+
+We can control the way that pseudo-counts are added with two
+properties of Motif objects \verb|.background| is the probability
+distribution over all symbols in the alphabet that we assume represents background, non-motif sequences (usually based on the GC content of the respective
+genome). It is by default set to a uniform distribution upon creation of a motif:
+\begin{verbatim}
+>>> m.background  
+{'A': 0.25, 'C': 0.25, 'T': 0.25, 'G': 0.25}
+\end{verbatim}
+The other parameter is \verb|.beta|, which states the amount of
+pseudo-counts we should add to the PWM. By default it is set to $1.0$,
+\begin{verbatim}
+>>> m.beta
+1.0
+\end{verbatim}
+so that the total input of pseudo-counts is equal to that of one instance. 
+
+Using the background distribution and pwm with pseudo-counts added,
+it's easy to compute the log-odds ratios, telling us what are the log
+odds of a particular symbol to be coming from a motif against the
+background. We can use the \verb|.log_odds()| method:
+
+\begin{verbatim}
+ >>> m.log_odds() 
+[{'A': -2.3219280948873622, 
+  'C': -2.3219280948873622, 
+  'T': 1.7655347463629771, 
+  'G': -2.3219280948873622}, 
+ {'A': 1.7655347463629771, 
+  'C': -2.3219280948873622, 
+  'T': -2.3219280948873622, 
+  'G': -2.3219280948873622}, 
+ {'A': -2.3219280948873622, 
+  'C': -2.3219280948873622, 
+  'T': 1.7655347463629771, 
+  'G': -2.3219280948873622}, 
+ {'A': 1.3785116232537298, 
+  'C': -2.3219280948873622, 
+  'T': 0.0, 
+  'G': -2.3219280948873622}, 
+ {'A': 1.7655347463629771, 
+  'C': -2.3219280948873622, 
+  'T': -2.3219280948873622, 
+  'G': -2.3219280948873622}
+]
+\end{verbatim}
+Here we can see positive values for symbols more frequent in the motif
+than in the background and negative for symbols more frequent in the
+background. $0.0$ means that it's equally likely to see a symbol in
+background and in the motif (e.g. `T' in the second-last position).
+
+\subsection{Reading and writing}
+\label{sec:io}
+
+Creating motifs from instances by hand is a bit boring, so it's
+useful to have some I/O functions for reading and writing
+motifs. There are no really well established standards for storing
+motifs, but there's a couple of formats which are more used than
+others. The most important distinction is whether the motif
+representation is based on instances or on some version of PWM matrix.
+On of the most popular motif databases \href{http://jaspar.genereg.net}{JASPAR}
+ stores motifs in both formats, so
+let's look at how we can import JASPAR motifs from instances:
+\begin{verbatim}
+arnt=Motif.read(open("Arnt.sites"),"jaspar-sites")
+\end{verbatim}
+and from a count matrix:
+\begin{verbatim}
+srf=Motif.read(open("SRF.pfm"),"jaspar-pfm")
+\end{verbatim}
+
+The \verb|arnt| and \verb|srf| motifs can both do the same things for
+us, but they use different internal representations of the motif. We
+can tell that by inspecting the \verb|has_counts| and
+\verb|has_instances| properties:
+\begin{verbatim}
+>>> arnt.has_instances
+True
+>>> srf.has_instances
+False
+>>> srf.has_counts
+True
+>>> srf.counts
+{'A': [2, 9, 0, 1, 32, 3, 46, 1, 43, 15, 2, 2],
+ 'C': [1, 33, 45, 45, 1, 1, 0, 0, 0, 1, 0, 1],
+ 'G': [39, 2, 1, 0, 0, 0, 0, 0, 0, 0, 44, 43],
+ 'T': [4, 2, 0, 0, 13, 42, 0, 45, 3, 30, 0, 0]}
+\end{verbatim}
+
+There are conversion functions, which can help us convert between
+different representations:
+\begin{verbatim}
+>>> arnt.make_counts_from_instances()
+{'A': [8, 38, 0, 0, 0, 0],
+ 'C': [32, 0, 40, 0, 0, 0],
+ 'G': [0, 2, 0, 40, 0, 40],
+ 'T': [0, 0, 0, 0, 40, 0]}
+
+>>> srf.make_instances_from_counts()
+[Seq('GGGAAAAAAAGG', IUPACUnambiguousDNA()),
+ Seq('GGCCAAATAAGG', IUPACUnambiguousDNA()),
+ Seq('GACCAAATAAGG', IUPACUnambiguousDNA()),
+....
+\end{verbatim}
+The important thing to remember here is that the method
+\verb|make_instances_from_counts()| creates fake instances, because
+usually there are very many possible sets of instances which give rise
+to the same pwm, and if we have only the count matrix, we cannot
+reconstruct the original one. This does not make any difference if we
+are using the PWM as the representation of the motif, but one should
+be careful with exporting instances from count-based motifs.
+
+Speaking of exporting, let's look at export functions. We can export to fasta:
+\begin{verbatim}
+>>> print m.format("fasta")
+>instance0
+TATAA
+>instance1
+TATTA
+>instance2
+TATAA
+>instance3
+TATAA
+\end{verbatim}
+or to TRANSFAC-like matrix format (used by some motif processing software)
+\begin{verbatim}
+>>> print m.format("transfac")
+XX
+TY Motif
+ID 
+BF undef
+P0 G A T C
+01 0 0 4 0
+02 0 4 0 0
+03 0 0 4 0
+04 0 3 1 0
+05 0 4 0 0
+XX
+\end{verbatim}
+
+Finally, if we have internet access, we can create a \href{http://weblogo.berkeley.edu}{weblogo}:
+\begin{verbatim}
+>>> arnt.weblogo("Arnt.png")
+\end{verbatim}
+We should get our logo saved as a png in the specified file.
+
+\subsection{Searching for instances}
+\label{sec:search}
+
+The most frequent use for a motif is to find its instances in some
+sequence. For the sake of this section, we will use an artificial sequence like this:
+
+\begin{verbatim}
+test_seq=Seq("TATGATGTAGTATAATATAATTATAA",m.alphabet)
+\end{verbatim}
+
+The simplest way to find instances, is to look for exact matches of
+the true instances of the motif:
+\begin{verbatim}
+>>> for pos,seq in m.search_instances(test_seq):
+...     print pos,seq.tostring()
+... 
+10 TATAA
+15 TATAA
+21 TATAA
+\end{verbatim}
+We can do the same with the reverse complement (to find instances on the complementary strand):
+\begin{verbatim}
+>>> for pos,seq in m.reverse_complement().search_instances(test_seq):
+...     print pos,seq.tostring()
+... 
+12 TAATA
+20 TTATA
+\end{verbatim}
+
+It's just as easy to look for positions, giving rise to high log-odds scores against our motif:
+\begin{verbatim}
+>>> for pos,score in m.search_pwm(test_seq,threshold=5.0):
+...     print pos,score
+... 
+10 8.44065060871
+-12 7.06213898545
+15 8.44065060871
+-20 8.44065060871
+21 8.44065060871
+\end{verbatim}
+You may notice the threshold parameter, here set arbitrarily to
+$5.0$. This is in $log_2$, so we are now looking only for words, which
+are 32 times more likely to occur under the motif model than in the
+background. The default threshold is $0.0$, which selects everything
+that looks more like the motif than the background.
+
+If you want to use a less arbitrary way of selecting thresholds, you
+can explore the \verb|Motif.score_distribution| class implementing an
+distribution of scores for a given motif. Since the space for a score
+distribution grows exponentially with motif length, we are using an
+approximation with a given precision to keep computation cost manageable:
+\begin{verbatim}
+>>> sd = Motif.score_distribution(m,precision=10**4)
+\end{verbatim}
+The sd object can be used to determine a number of different thresholds.
+
+We can specify the requested false-positive rate (probability of ``finding'' a motif instance in background generated sequence):
+\begin{verbatim}
+>>> sd.threshold_fpr(0.01)
+4.3535838726139886
+\end{verbatim}
+
+or the false-negative rate (probability of ``not finding'' an instance generated from the motif):
+\begin{verbatim}
+>>> sd.threshold_fnr(0.1)
+0.26651713652234044
+\end{verbatim}
+
+or a threshold (approximately) satisfying some relation between fpr
+and fnr $\frac{fnr}{fpr}\simeq t$:
+\begin{verbatim}
+>>> sd.threshold_balanced(1000)
+8.4406506087056368
+\end{verbatim}
+
+or a threshold satisfying (roughly) the equality between the
+false-positive rate and the $-log$ of the information content (as used
+in patser software by Hertz and Stormo).
+
+For example, in case of our motif, you can get the threshold giving
+you exactly the same results (for this sequence) as searching for
+instances with balanced threshold with rate of $1000$.
+\begin{verbatim}
+>>> for pos,score in m.search_pwm(test_seq,threshold=sd.threshold_balanced(1000)):
+...     print pos,score
+... 
+10 8.44065060871
+15 8.44065060871
+-20 8.44065060871
+21 8.44065060871
+\end{verbatim}
+
+\subsection{Comparing motifs}
+\label{sec:comp}
+Once we have more than one motif, we might want to compare them. For
+that, we have currently three different methods of \verb|Bio.Motif|
+objects.
+
+Before we start comparing motifs, I should point out that motif
+boundaries are usually quite arbitrary. This means, that we often need
+to compare motifs of different lengths, so comparison needs to involve
+some kind of alignment.  This means, that we have to take into account two things:
+\begin{itemize}
+\item alignment of motifs
+\item some function to compare aligned motifs
+\end{itemize}
+In \verb|Bio.Motif| we have 3 different functions for motif
+comparison, which are based on the same idea behind motif alignment,
+but use different functions to compare aligned motifs. Briefly
+speaking, we are using ungapped alignment of PWMs and substitute the
+missing columns at the beginning and end of the matrices with
+background distribution. All three comparison functions are written in
+such a way, that they can be interpreted as distance measures, however
+only one (\verb|dist_dpq|) satisfies the triangle inequality. All of
+them return the minimal distance and the corresponding offset between
+motifs.
+
+To show how these functions work, let us first load another motif,
+which is similar to our test motif \verb|m|:
+\begin{verbatim}
+>>> ubx=Motif.read(open("Ubx.pfm"),"jaspar-pfm")
+<Bio.Motif.Motif.Motif object at 0xc29b90>
+>>> ubx.consensus()
+Seq('TAAT', IUPACUnambiguousDNA())
+\end{verbatim}
+
+The first function we'll use to compare these motifs is based on
+Pearson correlation. Since we want it to resemble a distance
+measure, we actually take $1-r$, where $r$ is the Pearson correlation
+coefficient (PCC):
+\begin{verbatim}
+>>> m.dist_pearson(ubx)
+(0.41740393308237722, 2)
+\end{verbatim}
+This means, that the best PCC between motif \verb|m| and  \verb|Ubx| is obtained with the following alignment:
+\begin{verbatim}
+bbTAAT
+TATAAb
+\end{verbatim}
+where \verb|b| stands for background distribution. The PCC itself is
+roughly $1-0.42=0.58$. If we try the reverse complement of the Ubx motif:
+
+\begin{verbatim}
+>>> m.dist_pearson(ubx.reverse_complement())
+(0.25784180151584823, 1)
+\end{verbatim}
+We can see that the PCC is better (almost $0.75$), and the alignment is also different:
+\begin{verbatim}
+bATTA
+TATAA
+\end{verbatim}
+
+There are two other functions: \verb|dist_dpq|, which is a true metric (satisfying traingle inequality) based on the Kullback-Leibler divergence 
+\begin{verbatim}
+>>> m.dist_dpq(ubx.reverse_complement())
+(0.49292358382899853, 1)
+\end{verbatim}
+
+and the \verb|dist_product| method, which is based on the product of
+probabilities which can be interpreted as the probability of
+independently generating the same instance by both motifs.
+
+\begin{verbatim}
+>>> m.dist_product(ubx.reverse_complement())
+(0.16224587301064275, 1)
+\end{verbatim}
+
+\section{\emph{De novo} motif finding}
+\label{sec:find}
+
+Currently, biopython has only limited support for \emph{de novo} motif
+finding. Namely, we support running and parsing of AlignAce and
+MEME. Since the number of motif finding tools is growing rapidly, 
+contributions of new parsers are welcome. 
+
+\subsection{MEME}
+\label{sec:meme}
+
+Let's assume, you have run MEME on sequences of your choice with your
+favorite parameters and saved the output in the file
+\verb|meme.out|. You can retrieve the motifs reported by MEME by
+running the following piece of code:
+
+\begin{verbatim}
+>>> motifsM = list(Motif.parse(open("meme.out"),"MEME"))
+>>> motifsM
+[<Bio.Motif.MEMEMotif.MEMEMotif object at 0xc356b0>]
+\end{verbatim}
+
+Besides the most wanted list of motifs, the result object contains more useful information, accessible through properties with self-explanatory names:
+\begin{itemize}
+\item \verb|.alphabet|
+\item \verb|.datafile|
+\item \verb|.sequence_names|
+\item \verb|.version|
+\item \verb|.command|
+\end{itemize}
+
+The motifs returned by MEMEParser can be treated exactly like regular
+Motif objects (with instances), they also provide some extra
+functionality, by adding additional information about the instances. 
+
+\begin{verbatim}
+>>> motifsM[0].consensus()
+Seq('CTCAATCGTA', IUPACUnambiguousDNA())
+
+>>> motifsM[0].instances[0].pvalue
+8.71e-07
+>>> motifsM[0].instances[0].sequence_name
+'SEQ10;'
+>>> motifsM[0].instances[0].start
+3
+>>> motifsM[0].instances[0].strand
+'+'
+\end{verbatim}
+
+
+\subsection{AlignAce}
+\label{sec:alignace}
+
+We can do very similar things with AlignACE program. Assume, you have
+your output in the file \verb|alignace.out|. You can parse your output
+with the following code:
+
+\begin{verbatim}
+>>> motifsA=list(Motif.parse(open("alignace.out"),"AlignAce"))
+\end{verbatim}
+
+Again, your motifs behave as they should:
+\begin{verbatim}
+>>> motifsA[0].consensus()
+Seq('TCTACGATTGAG', IUPACUnambiguousDNA())
+\end{verbatim}
+
+In fact you can even see, that AlignAce found a very similar motif as
+MEME, it is just a longer version of a reverse complement of MEME
+motif:
+\begin{verbatim}
+>>> motifsM[0].reverse_complement().consensus()
+Seq('TACGATTGAG', IUPACUnambiguousDNA())
+\end{verbatim}
+
+If you have AlignAce installed on the same machine, you can also run
+it directly from Biopython. Short example of how this can be done is
+shown below (other parameters can be specified as keyword parameters):
+
+\begin{verbatim}
+>>> command="/opt/bin/AlignACE"
+>>> input_file="test.fa"
+>>> from Bio.Motif.Applications import AlignAceCommandline
+>>> cmd = AlignAceCommandline(cmd=command,input=input_file,gcback=0.6,numcols=10)
+>>> stdout,stderr= cmd()
+\end{verbatim}
+
+Since AlignAce prints all its output to standard output, you can get
+to your motifs by parsing the first part of the result:
+\begin{verbatim}
+motifs=list(Motif.parse(stdout,"AlignAce"))
+\end{verbatim}
+
+
+
+\section{Useful links }
+\label{sec:links}
+
+
+\begin{itemize}
+\item \href{http://en.wikipedia.org/wiki/Sequence_motif}{Sequence motif} in wikipedia
+\item \href{http://en.wikipedia.org/wiki/Position_weight_matrix}{PWM} in wikipedia
+\item \href{http://en.wikipedia.org/wiki/Consensus_sequence}{Consensus sequence} in wikipedia
+\item \href{http://bio.cs.washington.edu/assessment/}{Comparison of different motif finding programs} 
+\end{itemize}
+
 
 
 \chapter{Supervised learning methods}

@@ -98,9 +98,9 @@ ambiguous_rna_complement = {
     }
 
 
-def _make_ranges(dict):
+def _make_ranges(mydict):
     d = {}
-    for key, value in dict.items():
+    for key, value in mydict.iteritems():
         d[key] = (value, value)
     return d
 
@@ -121,10 +121,10 @@ unambiguous_rna_weights = {
 }
 unambiguous_rna_weight_ranges = _make_ranges(unambiguous_rna_weights)
 
-def _make_ambiguous_ranges(dict, weight_table):
+def _make_ambiguous_ranges(mydict, weight_table):
     range_d = {}
     avg_d = {}
-    for letter, values in dict.items():
+    for letter, values in mydict.iteritems():
         #Following line is a quick hack to skip undefined weights for U and O
         if len(values)==1 and values[0] not in weight_table : continue
         weights = map(weight_table.get, values)
@@ -210,7 +210,6 @@ extended_protein_weight_ranges, avg_extended_protein_weights = \
 # For Center of Mass Calculation.
 # Taken from http://www.chem.qmul.ac.uk/iupac/AtWt/ & PyMol
 atom_weigths = {
-    "?"  :   0.0,
     'H'  :   1.00794,
     'HE' :   4.002602,
     'LI' :   6.941,

@@ -42,7 +42,8 @@ def compare_reference(old_r, new_r):
     #TODO - assert old_r.comment == new_r.comment
     #Looking at the tables, I *think* the current schema does not
     #allow us to store a reference comment.  Must confirm this.
-    assert old_r.comment == new_r.comment or new_r.comment == ""
+    assert old_r.comment == new_r.comment or new_r.comment == "", \
+                          "%r vs %r" % (old_r.comment, new_r.comment)
 
     #TODO - assert old_r.consrtm == new_r.consrtm
     #Looking at the tables, I *think* the current schema does not
@@ -79,8 +80,7 @@ def compare_feature(old_f, new_f):
         "%s -> %s" % (old_f.ref_db, new_f.ref_db)
 
     #TODO - BioSQL does not store/retrieve feature's id (Bug 2526)   
-    #assert old_f.id == new_f.id
-    assert new_f.id == "<unknown id>"
+    assert old_f.id == new_f.id or new_f.id == "<unknown id>"
 
     #TODO - Work out how the location_qualifier_value table should
     #be used, given BioPerl seems to ignore it (Bug 2766)
@@ -156,8 +156,8 @@ def compare_feature(old_f, new_f):
                                      new_sub.location.nofuzzy_end)
 
     assert len(old_f.qualifiers) == len(new_f.qualifiers)    
-    assert set(old_f.qualifiers.keys()) == set(new_f.qualifiers.keys())
-    for key in old_f.qualifiers.keys():
+    assert set(old_f.qualifiers) == set(new_f.qualifiers)
+    for key in old_f.qualifiers:
         if isinstance(old_f.qualifiers[key], str):
             if isinstance(new_f.qualifiers[key], str):
                 assert old_f.qualifiers[key] == new_f.qualifiers[key]
@@ -267,7 +267,7 @@ def compare_record(old, new):
     #'ncbi_taxon' and 'gi'.
     #TODO - address these, see Bug 2681?
     new_keys = set(new.annotations).difference(old.annotations)
-    new_keys = new_keys.difference(['cross_references', 'dates', 
+    new_keys = new_keys.difference(['cross_references', 'date', 
                                     'data_file_division', 'ncbi_taxid', 'gi'])
     assert not new_keys, "Unexpected new annotation keys: %s" \
            % ", ".join(new_keys)
@@ -278,7 +278,7 @@ def compare_record(old, new):
            % ", ".join(missing_keys)
     
     #In the short term, just compare any shared keys:
-    for key in set(old.annotations.keys()).intersection(new.annotations.keys()):
+    for key in set(old.annotations).intersection(new.annotations):
         if key == "references":
             assert len(old.annotations[key]) == len(new.annotations[key])
             for old_r, new_r in zip(old.annotations[key], new.annotations[key]):

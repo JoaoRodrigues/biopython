@@ -3,22 +3,23 @@
 # license.  Please see the LICENSE file that should have been included
 # as part of this package.
 """Command line wrapper for the multiple alignment program TCOFFEE.
-
-http://www.tcoffee.org/Projects_home_page/t_coffee_home_page.html
-
-T-Coffee: A novel method for multiple sequence alignments.
-Notredame, Higgins, Heringa, JMB,302(205-217) 2000
-
-Last checked against: Version_6.92
 """
 
-import types
 from Bio.Application import _Option, _Switch, _Argument, AbstractCommandline
 
 class TCoffeeCommandline(AbstractCommandline):
     """Commandline object for the TCoffee alignment program.
     
-    Implements a VERY limited number of options.
+    The T-Coffee command line tool has a lot of switches and options.
+    This wrapper implements a VERY limited number of options - if you
+    would like to help improve it please get in touch.
+
+    http://www.tcoffee.org/Projects_home_page/t_coffee_home_page.html
+
+    T-Coffee: A novel method for multiple sequence alignments.
+    Notredame, Higgins, Heringa, JMB,302(205-217) 2000
+
+    Last checked against: Version_6.92
     """
     SEQ_TYPES = ["dna","protein","dna_protein"]
 
@@ -66,13 +67,13 @@ class TCoffeeCommandline(AbstractCommandline):
                     "Default: blosum62mt",
                     0),
            _Option(["-gapopen", "gapopen"], ["input"],
-                    lambda x: isinstance(x, types.IntType),
+                    lambda x: isinstance(x, int),
                     0,
                     "Indicates the penalty applied for opening a gap "
                     "(negative integer)",
                     0),
            _Option(["-gapext", "gapext"], ["input"],
-                    lambda x: isinstance(x, types.IntType),
+                    lambda x: isinstance(x, int),
                     0,
                     "Indicates the penalty applied for extending a "
                     "gap. (negative integer)",

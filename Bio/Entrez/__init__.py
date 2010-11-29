@@ -40,17 +40,30 @@ espell       Retrieves spelling suggestions.
 
 read         Parses the XML results returned by any of the above functions.
              Typical usage is:
+
              >>> handle = Entrez.einfo() # or esearch, efetch, ...
              >>> record = Entrez.read(handle)
+
              where record is now a Python dictionary or list.
+
+parse        Parses the XML results returned by any of the above functions,
+             returning records one by one.
+             Typical usage is:
+
+             >>> handle = Entrez.efetch(...) # or esummary, elink, ...
+             >>> records = Entrez.parse(handle)
+             >>> for record in records:
+             ...     # each record is a Python dictionary or list.
+             ...     print record
+
+             This function is appropriate only if the XML file contains
+             multiple records, and is particular useful for large files. 
 
 _open        Internally used function.
 
 """
-import urllib, time, warnings
+import urllib, urllib2, time, warnings
 import os.path
-from Bio import File
-
 
 email = None
 tool = "biopython"
@@ -94,15 +107,6 @@ def efetch(db, **keywds):
     handle = Entrez.efetch(db="nucleotide", id="57240072", rettype="gb")
     print handle.read()
     """
-    for key in keywds:
-        if key.lower()=="rettype" and keywds[key].lower()=="genbank":
-            warnings.warn('As of Easter 2009, Entrez EFetch no longer '
-                          'supports the unofficial return type "genbank", '
-                          'use "gb" or "gp" instead.', DeprecationWarning)
-            if db.lower()=="protein":
-                keywds[key] = "gp" #GenPept
-            else:
-                keywds[key] = "gb" #GenBank
     cgi='http://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi'
     variables = {'db' : db}
     variables.update(keywds)
@@ -241,7 +245,7 @@ def espell(**keywds):
     variables.update(keywds)
     return _open(cgi, variables)
 
-def read(handle):
+def read(handle, validate=True):
     """Parses an XML file from the NCBI Entrez Utilities into python objects.
     
     This function parses an XML file created by NCBI's Entrez Utilities,
@@ -250,6 +254,11 @@ def read(handle):
     this function, provided its DTD is available. Biopython includes the
     DTDs for most commonly used Entrez Utilities.
 
+    If validate is True (default), the parser will validate the XML file
+    against the DTD, and raise an error if the XML file contains tags that
+    are not represented in the DTD. If validate is False, the parser will
+    simply skip such tags.
+
     Whereas the data structure seems to consist of generic Python lists,
     dictionaries, strings, and so on, each of these is actually a class
     derived from the base type. This allows us to store the attributes
@@ -257,15 +266,38 @@ def read(handle):
     the tag name in my_element.tag.
     """
     from Parser import DataHandler
-    DTDs = os.path.join(str(__path__[0]), "DTDs")
-    handler = DataHandler(DTDs)
+    handler = DataHandler(validate)
     record = handler.read(handle)
     return record
 
-def parse(handle):
+def parse(handle, validate=True):
+    """Parses an XML file from the NCBI Entrez Utilities into python objects.
+    
+    This function parses an XML file created by NCBI's Entrez Utilities,
+    returning a multilevel data structure of Python lists and dictionaries.
+    This function is suitable for XML files that (in Python) can be represented
+    as a list of individual records. Whereas 'read' reads the complete file
+    and returns a single Python list, 'parse' is a generator function that
+    returns the records one by one. This function is therefore particularly
+    useful for parsing large files.
+
+    Most XML files returned by NCBI's Entrez Utilities can be parsed by
+    this function, provided its DTD is available. Biopython includes the
+    DTDs for most commonly used Entrez Utilities.
+
+    If validate is True (default), the parser will validate the XML file
+    against the DTD, and raise an error if the XML file contains tags that
+    are not represented in the DTD. If validate is False, the parser will
+    simply skip such tags.
+
+    Whereas the data structure seems to consist of generic Python lists,
+    dictionaries, strings, and so on, each of these is actually a class
+    derived from the base type. This allows us to store the attributes
+    (if any) of each element in a dictionary my_element.attributes, and
+    the tag name in my_element.tag.
+    """
     from Parser import DataHandler
-    DTDs = os.path.join(str(__path__[0]), "DTDs")
-    handler = DataHandler(DTDs)
+    handler = DataHandler(validate)
     records = handler.parse(handle)
     return records
 
@@ -316,60 +348,17 @@ a user at the email address provided before blocking access to the
 E-utilities.""", UserWarning)
     # Open a handle to Entrez.
     options = urllib.urlencode(params, doseq=True)
-    if post:
-        #HTTP POST
-        handle = urllib.urlopen(cgi, data=options)
-    else:
-        #HTTP GET
-        cgi += "?" + options
-        handle = urllib.urlopen(cgi)
+    try:
+        if post:
+            #HTTP POST
+            handle = urllib2.urlopen(cgi, data=options)
+        else:
+            #HTTP GET
+            cgi += "?" + options
+            handle = urllib2.urlopen(cgi)
+    except urllib2.HTTPError, exception:
+        raise exception
 
-    # Wrap the handle inside an UndoHandle.
-    uhandle = File.UndoHandle(handle)
-
-    # Check for errors in the first 7 lines.
-    # This is kind of ugly.
-    lines = []
-    for i in range(7):
-        lines.append(uhandle.readline())
-    for i in range(6, -1, -1):
-        uhandle.saveline(lines[i])
-    data = ''.join(lines)
-                   
-    if "500 Proxy Error" in data:
-        # Sometimes Entrez returns a Proxy Error instead of results
-        raise IOError("500 Proxy Error (NCBI busy?)")
-    elif "502 Proxy Error" in data:
-        raise IOError("502 Proxy Error (NCBI busy?)")
-    elif "WWW Error 500 Diagnostic" in data:
-        raise IOError("WWW Error 500 Diagnostic (NCBI busy?)")
-    elif "<title>Service unavailable!</title>" in data:
-        #Probably later in the file it will say "Error 503"
-        raise IOError("Service unavailable!")
-    elif "<title>Bad Gateway!</title>" in data:
-        #Probably later in the file it will say:
-        #  "The proxy server received an invalid
-        #   response from an upstream server."
-        raise IOError("Bad Gateway!")
-    elif "<title>414 Request-URI Too Large</title>" in data \
-    or "<h1>Request-URI Too Large</h1>" in data:
-        raise IOError("Requested URL too long (try using EPost?)")
-    elif data.startswith("Error:"):
-        #e.g. 'Error: Your session has expired. Please repeat your search.\n'
-        raise IOError(data.strip())
-    elif data.startswith("The resource is temporarily unavailable"):
-        #This can occur with an invalid query_key
-        #Perhaps this should be a ValueError?
-        raise IOError("The resource is temporarily unavailable")
-    elif data.startswith("download dataset is empty"):
-        #This can occur when omit the identifier, or the WebEnv and query_key
-        #Perhaps this should be a ValueError?
-        raise IOError("download dataset is empty")
-    elif data[:5] == "ERROR":
-        # XXX Possible bug here, because I don't know whether this really
-        # occurs on the first line.  I need to check this!
-        raise IOError("ERROR, possibly because id not available?")
-    # Should I check for 404?  timeout?  etc?
-    return uhandle
+    return handle
 
 _open.previous = 0

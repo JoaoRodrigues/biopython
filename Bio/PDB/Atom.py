@@ -7,10 +7,10 @@
 
 import numpy
 
-from Entity import DisorderedEntityWrapper
-from Vector import Vector
+from Bio.PDB.Entity import DisorderedEntityWrapper
+from Bio.PDB.PDBExceptions import PDBConstructionWarning
+from Bio.PDB.Vector import Vector
 from Bio.Data import IUPACData
-
 
 class Atom:
     def __init__(self, name, coord, bfactor, occupancy, altloc, fullname, serial_number,
@@ -69,7 +69,7 @@ class Atom:
         self.xtra={}
                 
         # Is HETATM?
-        self.hetatm = (hetero_flag == " ")
+        self.hetatm = (hetero_flag != " ")
 
         # Atom Element
         if not element or not IUPACData.atom_weigths.has_key(element):
@@ -83,11 +83,11 @@ class Atom:
             # HETATM check to clear ambiguities (CA: calcium, c/alpha ; HG: mercury, gamma hydrogen ; etc)
             # In cases of MSE for example, that count as HETATM, the elements will come out wrong .. how to fix?
             # Does not work for metals..
-            
+
             if self.hetatm:
                 putative_element = self.name
             else:
-                 # Hs may have digit in [0]
+                # Hs may have digit in [0]
                 if not self.name[0].isdigit():
                     putative_element = self.name[0] 
                 else:
@@ -100,12 +100,15 @@ class Atom:
             else:
                 warnings.warn("Atom object (name=%s) element could not be assigned" % (name),
                                PDBConstructionWarning)
-                element = "?"
+                element = ""
 
         self.element=element
 
         # Added by Joao for C.O.M. purposes
-        self.mass = IUPACData.atom_weigths[self.element]
+        if self.element:
+            self.mass = IUPACData.atom_weigths[self.element]
+        else:
+            self.mass = 'ukn'
         
     # Special methods   
 

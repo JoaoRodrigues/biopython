@@ -32,9 +32,10 @@ def reverse(seq):
     'TGGCA'
     """
     import warnings
+    import Bio
     warnings.warn("Bio.SeqUtils.reverse() is deprecated, use the string's "
                   "slice method with a step of minus one instead.",
-                  DeprecationWarning)
+                  Bio.BiopythonDeprecationWarning)
     r = list(seq)
     r.reverse()
     return ''.join(r)
@@ -231,8 +232,9 @@ class MissingTable:
     def __init__(self, table):
         self._table = table
         import warnings
+        import Bio
         warnings.warn("Function Bio.SeqUtils.makeTableX() and related classes ProteinX "
-                      "and MissingTable are deprecated.", DeprecationWarning)
+                      "and MissingTable are deprecated.", Bio.BiopythonDeprecationWarning)
     def get(self, codon, stop_symbol):
         try:
             return self._table.get(codon, stop_symbol)
@@ -288,10 +290,13 @@ def seq3(seq):
 # {{{ 
 
 def GC_Frame(seq, genetic_code = 1):
-    """Just an alias for six_frame_translations (OBSOLETE).
+    """Just an alias for six_frame_translations (DEPRECATED).
 
-    Use six_frame_translation directly, as this function may be deprecated
-    in a future release."""
+    Please use six_frame_translations directly, as this function is deprecated."""
+    import warnings
+    import Bio
+    warnings.warn("GC_Frame is deprecated; please use six_frame_translations instead",
+                  Bio.BiopythonDeprecationWarning)
     return six_frame_translations(seq, genetic_code)
 
 def six_frame_translations(seq, genetic_code = 1):
@@ -351,32 +356,36 @@ def six_frame_translations(seq, genetic_code = 1):
 ######################
 # {{{ 
 
-def fasta_uniqids(file):
-    """Checks and changes the name/ID's to be unique identifiers by adding numbers (OBSOLETE).
+def fasta_uniqids(filename):
+    """Checks and changes the name/ID's to be unique identifiers by adding numbers (DEPRECATED).
 
     file - a FASTA format filename to read in.
 
     No return value, the output is written to screen.
     """
-    dict = {}
-    txt = open(file).read()
+    import warnings
+    import Bio
+    warnings.warn("fasta_uniqids is deprecated", Bio.BiopythonDeprecationWarning)
+
+    mydict = {}
+    txt = open(filename).read()
     entries = []
     for entry in txt.split('>')[1:]:
         name, seq= entry.split('\n',1)
         name = name.split()[0].split(',')[0]
       
-        if name in dict:
+        if name in mydict:
             n = 1
             while 1:
                 n = n + 1
                 _name = name + str(n)
-                if _name not in dict:
+                if _name not in mydict:
                     name = _name
                     break
             
-        dict[name] = seq
+        mydict[name] = seq
 
-    for name, seq in dict.items():
+    for name, seq in mydict.iteritems():
         print '>%s\n%s' % (name, seq)
 
 def quick_FASTA_reader(file):
@@ -411,7 +420,7 @@ def quick_FASTA_reader(file):
     return entries
 
 def apply_on_multi_fasta(file, function, *args):
-    """Apply a function on each sequence in a multiple FASTA file (OBSOLETE).
+    """Apply a function on each sequence in a multiple FASTA file (DEPRECATED).
 
     file - filename of a FASTA format file
     function - the function you wish to invoke on each record
@@ -426,6 +435,9 @@ def apply_on_multi_fasta(file, function, *args):
     FASTA format string.  If your function never has a return value, this
     means apply_on_multi_fasta will return an empty list.
     """
+    import warnings
+    import Bio
+    warnings.warn("apply_on_multi_fasta is deprecated", Bio.BiopythonDeprecationWarning)
     try:
         f = globals()[function]
     except:
@@ -444,7 +456,7 @@ def apply_on_multi_fasta(file, function, *args):
     return results
          
 def quicker_apply_on_multi_fasta(file, function, *args):
-    """Apply a function on each sequence in a multiple FASTA file (OBSOLETE).
+    """Apply a function on each sequence in a multiple FASTA file (DEPRECATED).
 
     file - filename of a FASTA format file
     function - the function you wish to invoke on each record
@@ -460,6 +472,9 @@ def quicker_apply_on_multi_fasta(file, function, *args):
     FASTA format string.  If your function never has a return value, this
     means quicker_apply_on_multi_fasta will return an empty list.
     """
+    import warnings
+    import Bio
+    warnings.warn("quicker_apply_on_multi_fasta is deprecated", Bio.BiopythonDeprecationWarning)
     try:
         f = globals()[function]
     except:
@@ -534,3 +549,12 @@ if __name__ == '__main__':
 
 # }}}
 
+def _test():
+    """Run the Bio.SeqUtils module's doctests (PRIVATE)."""
+    print "Runing doctests..."
+    import doctest
+    doctest.testmod()
+    print "Done"
+
+if __name__ == "__main__":
+    _test()

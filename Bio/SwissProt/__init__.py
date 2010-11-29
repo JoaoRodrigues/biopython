@@ -21,6 +21,7 @@ parse              Read multiple SwissProt records
 
 """
 
+from Bio._py3k import _as_string
 
 class Record:
     """Holds information from a SwissProt record.
@@ -43,8 +44,8 @@ class Record:
     organism_classification  The taxonomy classification.  List of strings.
                              (http://www.ncbi.nlm.nih.gov/Taxonomy/)
     taxonomy_id       A list of NCBI taxonomy id's.
-    host_organism     A list of NCBI taxonomy id's of the hosts of a virus,
-                      if any.
+    host_organism     A list of names of the hosts of a virus, if any.
+    host_taxonomy_id  A list of NCBI taxonomy id's of the hosts, if any.
     references        List of Reference objects.
     comments          List of strings.
     cross_references  List of tuples (db, id1[, id2][, id3]).  See the docs.
@@ -75,6 +76,7 @@ class Record:
         self.organism_classification = []
         self.taxonomy_id = []
         self.host_organism = []
+        self.host_taxonomy_id = []
         self.references = []
         self.comments = []
         self.cross_references = []
@@ -134,6 +136,9 @@ def _read(handle):
     record = None
     unread = ""
     for line in handle:
+        #This is for Python 3 to cope with a binary handle (byte strings),
+        #or a text handle (unicode strings):
+        line = _as_string(line)
         key, value = line[:2], line[5:].rstrip()
         if unread:
             value = unread + " " + value
@@ -231,8 +236,10 @@ def _read(handle):
             record.organism = " ".join(record.organism)
             record.organelle   = record.organelle.rstrip()
             for reference in record.references:
-                reference.authors = " ".join(reference.authors)
-                reference.title = " ".join(reference.title)
+                reference.authors = " ".join(reference.authors).rstrip(";")
+                reference.title = " ".join(reference.title).rstrip(";")
+                if reference.title.startswith('"') and reference.title.endswith('"'):
+                    reference.title = reference.title[1:-1] #remove quotes
                 reference.location = " ".join(reference.location)
             record.sequence = "".join(_sequence_lines)
             return record
@@ -388,16 +395,12 @@ def _read_ox(record, line):
 
 def _read_oh(record, line):
     # Line type OH (Organism Host) for viral hosts
-    # same code as in taxonomy_id()
-    line = line[5:].rstrip().rstrip(";")
-    index = line.find('=')
-    if index >= 0:
-        descr = line[:index]
-        assert descr == "NCBI_TaxID", "Unexpected taxonomy type %s" % descr
-        ids = line[index+1:].split(',')
-    else:
-        ids = line.split(',')
-    record.host_organism.extend([id.strip() for id in ids])
+    assert line[5:].startswith("NCBI_TaxID="), "Unexpected %s" % line
+    line = line[16:].rstrip()
+    assert line[-1]=="." and line.count(";")==1, line
+    taxid, name = line[:-1].split(";")
+    record.host_taxonomy_id.append(taxid.strip())
+    record.host_organism.append(name.strip())
 
 
 def _read_rn(reference, rn):
@@ -494,17 +497,18 @@ def _read_ft(record, line):
         to_res = int(line[16:22])
     except ValueError:
         to_res = line[16:22].lstrip()
-    description = line[29:70].rstrip()
     #if there is a feature_id (FTId), store it away
     if line[29:35]==r"/FTId=":
         ft_id = line[35:70].rstrip()[:-1]
+        description = ""
     else:
         ft_id =""
+        description = line[29:70].rstrip()
     if not name:  # is continuation of last one
         assert not from_res and not to_res
         name, from_res, to_res, old_description,old_ft_id = record.features[-1]
         del record.features[-1]
-        description = "%s %s" % (old_description, description)
+        description = ("%s %s" % (old_description, description)).strip()
 
         # special case -- VARSPLIC, reported by edvard@farmasi.uit.no
         if name == "VARSPLIC":

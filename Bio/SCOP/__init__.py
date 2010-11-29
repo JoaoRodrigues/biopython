@@ -476,7 +476,7 @@ class Scop:
         cur.execute("CREATE TABLE hie (parent INT, child INT, PRIMARY KEY (child),\
         INDEX (parent) )")
 
-        for p in self._sunidDict.values():
+        for p in self._sunidDict.itervalues():
             for c in p.children:
                 cur.execute("INSERT INTO hie VALUES (%s,%s)" % (p.sunid, c.sunid))
 
@@ -490,7 +490,7 @@ class Scop:
         residues VARCHAR(50), sccs CHAR(10), cl INT, cf INT, sf INT, fa INT,\
         dm INT, sp INT, px INT, PRIMARY KEY (sunid), INDEX (SID) )")
 
-        for n in self._sidDict.values():
+        for n in self._sidDict.itervalues():
             c = n.toClaRecord()
             cur.execute( "INSERT INTO cla VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
                          (n.sunid, n.sid, c.residues.pdbid, c.residues, n.sccs,
@@ -509,7 +509,7 @@ class Scop:
         description VARCHAR(255),\
         PRIMARY KEY (sunid) )")
         
-        for n in self._sunidDict.values():
+        for n in self._sunidDict.itervalues():
             cur.execute( "INSERT INTO des VALUES (%s,%s,%s,%s)",
                          ( n.sunid, n.type, n.sccs, n.description ) )                        
         
@@ -851,10 +851,9 @@ class Astral:
         cur.execute("DROP TABLE IF EXISTS astral")
         cur.execute("CREATE TABLE astral (sid CHAR(8), seq TEXT, PRIMARY KEY (sid))")
 
-        for dom in self.fasta_dict.keys():
-            cur.execute( "INSERT INTO astral (sid,seq) values (%s,%s)",
-                         (dom, self.fasta_dict[dom].seq.data))
-        
+        for dom in self.fasta_dict:
+            cur.execute("INSERT INTO astral (sid,seq) values (%s,%s)",
+                        (dom, self.fasta_dict[dom].seq.data))
         
         for i in astralBibIds:
             cur.execute("ALTER TABLE astral ADD (id"+str(i)+" TINYINT)")
@@ -886,9 +885,9 @@ def search(pdb=None, key=None, sid=None, disp=None, dir=None, loc=None,
     params = {'pdb' : pdb, 'key' : key, 'sid' : sid, 'disp' : disp,
               'dir' : dir, 'loc' : loc}
     variables = {}
-    for k in params.keys():
-        if params[k] is not None:
-            variables[k] = params[k]
+    for k, v in params.iteritmes():
+        if v is not None:
+            variables[k] = v
     variables.update(keywds)
     return _open(cgi, variables)
 

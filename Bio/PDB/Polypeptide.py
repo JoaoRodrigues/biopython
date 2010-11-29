@@ -5,19 +5,57 @@
 
 """Polypeptide-related classes (construction and representation).
 
-Example:
+Simple example with multiple chains,
 
+    >>> from Bio.PDB.PDBParser import PDBParser
+    >>> from Bio.PDB.Polypeptide import PPBuilder
+    >>> structure = PDBParser().get_structure('2BEG', 'PDB/2BEG.pdb')
     >>> ppb=PPBuilder()
     >>> for pp in ppb.build_peptides(structure):
     ...     print pp.get_sequence()
+    LVFFAEDVGSNKGAIIGLMVGGVVIA
+    LVFFAEDVGSNKGAIIGLMVGGVVIA
+    LVFFAEDVGSNKGAIIGLMVGGVVIA
+    LVFFAEDVGSNKGAIIGLMVGGVVIA
+    LVFFAEDVGSNKGAIIGLMVGGVVIA
+
+Example with non-standard amino acids using HETATM lines in the PDB file,
+in this case selenomethionine (MSE):
+
+    >>> from Bio.PDB.PDBParser import PDBParser
+    >>> from Bio.PDB.Polypeptide import PPBuilder
+    >>> structure = PDBParser().get_structure('1A8O', 'PDB/1A8O.pdb')
+    >>> ppb=PPBuilder()
+    >>> for pp in ppb.build_peptides(structure):
+    ...     print pp.get_sequence()
+    DIRQGPKEPFRDYVDRFYKTLRAEQASQEVKNW
+    TETLLVQNANPDCKTILKALGPGATLEE
+    TACQG
+
+If you want to, you can include non-standard amino acids in the peptides:
+
+    >>> for pp in ppb.build_peptides(structure, aa_only=False):
+    ...     print pp.get_sequence()
+    ...     print pp.get_sequence()[0], pp[0].get_resname()
+    ...     print pp.get_sequence()[-7], pp[-7].get_resname()
+    ...     print pp.get_sequence()[-6], pp[-6].get_resname()
+    MDIRQGPKEPFRDYVDRFYKTLRAEQASQEVKNWMTETLLVQNANPDCKTILKALGPGATLEEMMTACQG
+    M MSE
+    M MSE
+    M MSE
+
+In this case the selenomethionines (the first and also seventh and sixth from
+last residues) have been shown as M (methionine) by the get_sequence method.
 """
+
+import warnings
 
 from Bio.Alphabet import generic_protein
 from Bio.Seq import Seq
 from Bio.SCOP.Raf import to_one_letter_code
 from Bio.PDB.PDBExceptions import PDBException
 from Bio.PDB.Residue import Residue, DisorderedResidue
-from Vector import calc_dihedral, calc_angle
+from Bio.PDB.Vector import calc_dihedral, calc_angle
 
 
 standard_aa_names=["ALA", "CYS", "ASP", "GLU", "PHE", "GLY", "HIS", "ILE", "LYS", 
@@ -43,59 +81,94 @@ for i in range(0, 20):
     dindex_to_3[i]=n3
 
 def index_to_one(index):
-    """
-    Index to corresponding one letter amino acid name.
-    For example: 0 to A.
+    """Index to corresponding one letter amino acid name.
+    
+    >>> index_to_one(0)
+    'A'
+    >>> index_to_one(19)
+    'Y'
     """
     return dindex_to_1[index]
 
 def one_to_index(s):
-    """
-    One letter code to index.
-    For example: A to 0.
+    """One letter code to index.
+    
+    >>> one_to_index('A')
+    0
+    >>> one_to_index('Y')
+    19
     """
     return d1_to_index[s]
 
 def index_to_three(i):
-    """
-    Index to corresponding three letter amino acid name.
-    For example: 0 to ALA.
+    """Index to corresponding three letter amino acid name.
+    
+    >>> index_to_three(0)
+    'ALA'
+    >>> index_to_three(19)
+    'TYR'
     """
     return dindex_to_3[i]
 
 def three_to_index(s):
-    """
-    Three letter code to index.
-    For example: ALA to 0.
+    """Three letter code to index.
+    
+    >>> three_to_index('ALA')
+    0
+    >>> three_to_index('TYR')
+    19
     """
     return d3_to_index[s]
 
 def three_to_one(s):
-    """
-    Three letter code to one letter code.
-    For example: ALA to A.
+    """Three letter code to one letter code.
+    
+    >>> three_to_one('ALA')
+    'A'
+    >>> three_to_one('TYR')
+    'Y'
+
+    For non-standard amino acids, you get a KeyError:
+
+    >>> three_to_one('MSE')
+    Traceback (most recent call last):
+       ...
+    KeyError: 'MSE'
     """
     i=d3_to_index[s]
     return dindex_to_1[i]
 
 def one_to_three(s):
-    """
-    One letter code to three letter code.
-    For example: A to ALA.
+    """One letter code to three letter code.
+    
+    >>> one_to_three('A')
+    'ALA'
+    >>> one_to_three('Y')
+    'TYR'
     """
     i=d1_to_index[s]
     return dindex_to_3[i]
 
-def is_aa(residue, standard=0):
-    """
-    Return 1 if residue object/string is an amino acid.
+def is_aa(residue, standard=False):
+    """Return True if residue object/string is an amino acid.
 
     @param residue: a L{Residue} object OR a three letter amino acid code
     @type residue: L{Residue} or string
 
     @param standard: flag to check for the 20 AA (default false) 
     @type standard: boolean
+
+    >>> is_aa('ALA')
+    True
+
+    Known three letter codes for modified amino acids are supported,
+
+    >>> is_aa('FME')
+    True
+    >>> is_aa('FME', standard=True)
+    False
     """
+    #TODO - What about special cases like XXX, can they appear in PDB files?
     if not isinstance(residue, basestring):
         residue=residue.get_resname()
     residue=residue.upper()
@@ -106,11 +179,10 @@ def is_aa(residue, standard=0):
 
 
 class Polypeptide(list):
-    """
-    A polypeptide is simply a list of L{Residue} objects.
-    """
+    """A polypeptide is simply a list of L{Residue} objects."""
     def get_ca_list(self):
-        """
+        """Get list of C-alpha atoms in the polypeptide.
+        
         @return: the list of C-alpha atoms
         @rtype: [L{Atom}, L{Atom}, ...]
         """
@@ -121,9 +193,7 @@ class Polypeptide(list):
         return ca_list
 
     def get_phi_psi_list(self):
-        """
-        Return the list of phi/psi dihedral angles
-        """
+        """Return the list of phi/psi dihedral angles."""
         ppl=[]
         lng=len(self)
         for i in range(0, lng):
@@ -168,10 +238,7 @@ class Polypeptide(list):
         return ppl
 
     def get_tau_list(self):
-        """
-        Return list of tau torsions angles for all 4 consecutive
-        Calpha atoms.
-        """
+        """List of tau torsions angles for all 4 consecutive Calpha atoms."""
         ca_list=self.get_ca_list()
         tau_list=[]
         for i in range(0, len(ca_list)-3):
@@ -185,10 +252,7 @@ class Polypeptide(list):
         return tau_list
 
     def get_theta_list(self):
-        """
-        Return list of theta angles for all 3 consecutive
-        Calpha atoms.
-        """
+        """List of theta angles for all 3 consecutive Calpha atoms."""
         theta_list=[]
         ca_list=self.get_ca_list()
         for i in range(0, len(ca_list)-2):
@@ -202,8 +266,7 @@ class Polypeptide(list):
         return theta_list
 
     def get_sequence(self):
-        """
-        Return the AA sequence.
+        """Return the AA sequence as a Seq object.
 
         @return: polypeptide sequence 
         @rtype: L{Seq}
@@ -215,7 +278,8 @@ class Polypeptide(list):
         return seq
 
     def __repr__(self):
-        """
+        """Return string representation of the polypeptide.
+        
         Return <Polypeptide start=START end=END>, where START
         and END are sequence identifiers of the outer residues.
         """
@@ -225,11 +289,12 @@ class Polypeptide(list):
         return s
 
 class _PPBuilder:
-    """
-    Base class to extract polypeptides.
-    It checks if two consecutive residues in a chain 
-    are connected. The connectivity test is implemented by a 
-    subclass.
+    """Base class to extract polypeptides.
+    
+    It checks if two consecutive residues in a chain are connected.
+    The connectivity test is implemented by a subclass.
+    
+    This assumes you want both standard and non-standard amino acids.
     """
     def __init__(self, radius):
         """
@@ -238,25 +303,23 @@ class _PPBuilder:
         """
         self.radius=radius
 
-    def _accept(self, residue):
-        "Check if the residue is an amino acid."
-        if is_aa(residue):
-            return 1
+    def _accept(self, residue, standard_aa_only):
+        """Check if the residue is an amino acid (PRIVATE)."""
+        if is_aa(residue, standard=standard_aa_only):
+            return True
+        elif not standard_aa_only and "CA" in residue.child_dict:
+            #It has an alpha carbon...
+            #We probably need to update the hard coded list of
+            #non-standard residues, see function is_aa for details.
+            warnings.warn("Assuming residue %s is an unknown modified "
+                          "amino acid" % residue.get_resname())
+            return True
         else:
-            if "CA" in residue.child_dict:
-                #It has an alpha carbon...
-                #We probably need to update the hard coded list of
-                #non-standard residues, see function is_aa for details.
-                import warnings
-                warnings.warn("Assuming residue %s is an unknown modified "
-                              "amino acid" % residue.get_resname())
-                return 1
             # not a standard AA so skip
-            return 0
+            return False
     
     def build_peptides(self, entity, aa_only=1):
-        """
-        Build and return a list of Polypeptide objects.
+        """Build and return a list of Polypeptide objects.
 
         @param entity: polypeptides are searched for in this object
         @type entity: L{Structure}, L{Model} or L{Chain}
@@ -280,37 +343,42 @@ class _PPBuilder:
         pp_list=[]
         for chain in chain_list:
             chain_it=iter(chain)
-            prev=chain_it.next()
+            try:
+                prev_res = chain_it.next()
+                while not accept(prev_res, aa_only):
+                    prev_res = chain_it.next()
+            except StopIteration:
+                #No interesting residues at all in this chain
+                continue
             pp=None
-            for next in chain_it:
-                if aa_only and not accept(prev):
-                    prev=next
-                    continue
-                if is_connected(prev, next):
+            for next_res in chain_it:
+                if accept(prev_res, aa_only) \
+                and accept(next_res, aa_only) \
+                and is_connected(prev_res, next_res):
                     if pp is None:
                         pp=Polypeptide()
-                        pp.append(prev)
+                        pp.append(prev_res)
                         pp_list.append(pp)
-                    pp.append(next)
+                    pp.append(next_res)
                 else:
+                    #Either too far apart, or one of the residues is unwanted.
+                    #End the current peptide
                     pp=None
-                prev=next
+                prev_res=next_res
         return pp_list
 
 
 class CaPPBuilder(_PPBuilder):
-    """
-    Use CA--CA distance to find polypeptides.
-    """
+    """Use CA--CA distance to find polypeptides."""
     def __init__(self, radius=4.3):
         _PPBuilder.__init__(self, radius)
 
-    def _is_connected(self, prev, next):
-        for r in [prev, next]:
+    def _is_connected(self, prev_res, next_res):
+        for r in [prev_res, next_res]:
             if not r.has_id("CA"):
-                return 0
-        n=next["CA"]
-        p=prev["CA"]
+                return False
+        n=next_res["CA"]
+        p=prev_res["CA"]
         # Unpack disordered
         if n.is_disordered():
             nlist=n.disordered_get_list()
@@ -323,25 +391,23 @@ class CaPPBuilder(_PPBuilder):
         for nn in nlist:
             for pp in plist:
                 if (nn-pp)<self.radius:
-                    return 1
-        return 0
+                    return True
+        return False
 
 
 class PPBuilder(_PPBuilder):
-    """
-    Use C--N distance to find polypeptides.
-    """
+    """Use C--N distance to find polypeptides."""
     def __init__(self, radius=1.8):
         _PPBuilder.__init__(self, radius)
 
-    def _is_connected(self, prev, next):
-        if not prev.has_id("C"):
-            return 0
-        if not next.has_id("N"):
-            return 0
+    def _is_connected(self, prev_res, next_res):
+        if not prev_res.has_id("C"):
+            return False
+        if not next_res.has_id("N"):
+            return False
         test_dist=self._test_dist
-        c=prev["C"]
-        n=next["N"]
+        c=prev_res["C"]
+        n=next_res["N"]
         # Test all disordered atom positions!
         if c.is_disordered():
             clist=c.disordered_get_list()
@@ -366,11 +432,11 @@ class PPBuilder(_PPBuilder):
                             c.disordered_select(c_altloc)
                         if n.is_disordered():
                             n.disordered_select(n_altloc)
-                        return 1
-        return 0
+                        return True
+        return False
 
     def _test_dist(self, c, n):
-        "Return 1 if distance between atoms<radius"
+        """Return 1 if distance between atoms<radius (PRIVATE)."""
         if (c-n)<self.radius:
             return 1
         else:
@@ -378,9 +444,7 @@ class PPBuilder(_PPBuilder):
     
 
 if __name__=="__main__":
-
     import sys
-
     from Bio.PDB.PDBParser import PDBParser
 
     p=PDBParser(PERMISSIVE=1)
@@ -410,6 +474,4 @@ if __name__=="__main__":
         print pp.get_sequence()
     for pp in ppb.build_peptides(s[0]["A"]):
         print pp.get_sequence()
-
-
 

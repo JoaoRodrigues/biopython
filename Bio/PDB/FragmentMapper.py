@@ -34,10 +34,10 @@ import numpy
 
 from Bio.SVDSuperimposer import SVDSuperimposer
 
-import Selection
-from PDBExceptions import PDBException
-from PDBParser import PDBParser
-from Polypeptide import PPBuilder
+from Bio.PDB import Selection
+from Bio.PDB.PDBExceptions import PDBException
+from Bio.PDB.PDBParser import PDBParser
+from Bio.PDB.Polypeptide import PPBuilder
 
 
 # fragment file (lib_SIZE_z_LENGTH.txt)
@@ -297,6 +297,8 @@ class FragmentMapper:
 
         @type res: L{Residue}
         """
+        import warnings
+        warnings.warn("has_key is obsolete; use 'res in object' instead", PendingDeprecationWarning)
         return (res in self)
 
     def __contains__(self, res):
