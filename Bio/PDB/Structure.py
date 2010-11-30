@@ -76,7 +76,8 @@ class Structure(Entity):
                     res.id = (res.id[0], res.id[1]+displace, res.id[2])
         
     def build_biological_unit(self):
-        """ Uses information from header to build full biological unit assembly.
+        """ Uses information from header (REMARK 350) to build full biological
+            unit assembly.
             Each new subunit is added to the structure as a new MODEL record.
             Identity matrix is ignored.
             Returns an integer with the number of matrices used.
@@ -87,8 +88,7 @@ class Structure(Entity):
         if self.header['biological_unit']:
             biomt_data = self.header['biological_unit'][1:] # 1st is identity
         else:
-            return "PDB File lacks appropriate REMARK 350 \
-                    entries to build Biological Unit."
+            raise ValueError( "REMARK 350 field missing in the PDB file")
 
         temp = [] # container for new models
         seed = 0 # Seed for model numbers
