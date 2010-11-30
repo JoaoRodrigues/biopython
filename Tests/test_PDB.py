@@ -26,7 +26,8 @@ from Bio.Alphabet import generic_protein
 from Bio.PDB import PDBParser, PPBuilder, CaPPBuilder, PDBIO
 from Bio.PDB import HSExposureCA, HSExposureCB, ExposureCN
 from Bio.PDB.PDBExceptions import PDBConstructionException, PDBConstructionWarning
-
+from Bio.PDB import NeighborSearch
+from numpy.random import random
 
 # NB: the 'A_' prefix ensures this test case is run first
 class A_ExceptionTest(unittest.TestCase):
@@ -733,8 +734,6 @@ class Exposure(unittest.TestCase):
         self.assertEqual(1, len(residues[-1].xtra))
         self.assertEqual(38, residues[-1].xtra["EXP_CN"])
 
-<<<<<<< HEAD
-
 class NeighborTest(unittest.TestCase):
     def setUp(self):
         warnings.resetwarnings()
@@ -744,6 +743,7 @@ class NeighborTest(unittest.TestCase):
          
         Based on the self test in Bio.PDB.NeighborSearch.
         """
+                
         class RandomAtom:
             def __init__(self):
                 self.coord = 100 * random(3)
@@ -813,10 +813,6 @@ class GSOC2010_Test(unittest.TestCase):
         self.assertEqual('C', atoms[9].element) # CA
         self.assertEqual('C', atoms[10].element) # CA        
         
-        
-        
-=======
->>>>>>> master
 # -------------------------------------------------------------
 
 if __name__ == '__main__':
