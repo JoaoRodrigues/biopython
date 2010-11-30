@@ -27,7 +27,6 @@ from Bio.PDB import PDBParser, PPBuilder, CaPPBuilder, PDBIO
 from Bio.PDB import HSExposureCA, HSExposureCB, ExposureCN
 from Bio.PDB.PDBExceptions import PDBConstructionException, PDBConstructionWarning
 from Bio.PDB import NeighborSearch
-from numpy.random import random
 
 # NB: the 'A_' prefix ensures this test case is run first
 class A_ExceptionTest(unittest.TestCase):
@@ -736,7 +735,7 @@ class Exposure(unittest.TestCase):
 
 class NeighborTest(unittest.TestCase):
     def setUp(self):
-        warnings.resetwarnings()
+        warnings.filters.pop()
 
     def test_neighbor_search(self):
         """NeighborSearch: Find nearby randomly generated coordinates.
@@ -746,7 +745,7 @@ class NeighborTest(unittest.TestCase):
                 
         class RandomAtom:
             def __init__(self):
-                self.coord = 100 * random(3)
+                self.coord = 100 * numpy.random.random(3)
             def get_coord(self):
                 return self.coord
         for i in range(0, 20):
@@ -760,7 +759,7 @@ class GSOC2010_Test(unittest.TestCase):
         added in the GSOC 2010 plan.    """
         
     def setUp(self):
-        warnings.resetwarnings()
+        warnings.filters.pop()
         warnings.simplefilter('ignore', PDBConstructionWarning)
 
         self.parser = PDBParser()
