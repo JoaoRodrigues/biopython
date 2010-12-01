@@ -104,7 +104,7 @@ class Atom:
 
         self.element=element
 
-        # Added by Joao for C.O.M. purposes
+        # Added for C.O.M. purposes
         if self.element:
             self.mass = IUPACData.atom_weigths[self.element]
         else:
