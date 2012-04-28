@@ -3,11 +3,10 @@
 # license. Please see the LICENSE file that should have been included
 # as part of this package.
 
-"""Package for Structural Biology Routines .
+"""Package for Structural Biology Routines.
 
-See also: U{ http://biopython.org/wiki/Struct }
+See also: http://biopython.org/wiki/Struct
 """
-
-__docformat__ = "epytext en"
+__docformat__ = "restructuredtext en"
 
 from Bio.Struct._io import read, write#, convert
