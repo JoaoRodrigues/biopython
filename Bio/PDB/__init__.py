@@ -24,9 +24,7 @@ Contributions by:
 """
 
 import gzip
-import contextlib
-
-from pathlib import Path
+from pathlib import Path, PurePath
 
 # Get a Structure object from a PDB file using available parsers
 from .PDBParser import PDBParser
@@ -35,8 +33,9 @@ from .MMCIFParser import FastMMCIFParser
 
 try:
     from .mmtf import MMTFParser
+    _have_mmtf = True
 except ImportError:
-    pass
+    _have_mmtf = False
 
 # Download from the PDB
 from .PDBList import PDBList
@@ -99,17 +98,32 @@ try:
 except ImportError:
     pass
 
-_FormatToParser = {"pdb": PDBParser, "cif": MMCIFParser}
+_fmt_to_parser = {
+    # PDB
+    "pdb": PDBParser,
+    "pdb.gz": PDBParser,
+    "pdb1": PDBParser,
+    "pdb1.gz": PDBParser,
+    "ent": PDBParser,
+    "ent.gz": PDBParser,
+    # mmCIF
+    "mmcif": MMCIFParser,
+    "cif": MMCIFParser,
+    "cif.gz": MMCIFParser,
+}
+
+if _have_mmtf:
+    _fmt_to_parser["mmtf"] = MMTFParser
+    _fmt_to_parser["mmtf.gz"] = MMTFParser
 
 
-def _check_format(fmt, parseropt):
-    """Return a parser that exists."""
-    # TODO should a more helpful message be printed if parseropt
-    # does not exist for parser and TypeError is raised?
-    if fmt in _FormatToParser:
-        return _FormatToParser[fmt](**parseropt)
-    else:
-        raise ValueError("Unknown format '%s'" % fmt)
+def _get_file_extension(filename):
+    """Returns the file extension, ignoring compression suffixes (such as .gz).
+    """
+    exts = [ext[1:].lower() for ext in Path(filename).suffixes]
+    if exts[-1] == 'gz':
+        return exts[-2]
+    return exts[-1]
 
 
 def _as_handle_gzip(handle):
@@ -127,56 +141,76 @@ def _as_handle_gzip(handle):
         return handle
 
 
-def read(handle, fmt, **kwargs):
-    """Parse a file or handle using one of the available parsers to generate a structure.
+def read(handle, fmt=None, **kwargs):
+    """Create a Structure from an open file or a file name.
+
 
     Arguments:
-     - handle    - handle to the file, or the filename as a string
-     - fmt       - string describing the file format. can be [pdb, cif, mmtf]
+     - handle    - handle to the open file, or file name as a string.
+     - fmt       - string defining the file format. If None (default), will try
+                   to guess the file format from the file extension.
 
-    If you have the file name in a string 'filename', use:
+    Examples:
+
+    You can read a structure from a file name:
 
     >>> from Bio import PDB
     >>> filename = "../Tests/PDB/1A8O.pdb"
+    >>> structure = PDB.read(filename)
     >>> structure = PDB.read(filename, fmt="pdb")
 
-    The function also supports file handles and gzip files
+    or from a pathlib Path object:
+
+    >>> import pathlib
+    >>> filepath = pathlib.Path("../Tests/PDB/1A8O.pdb")
+    >>> structure = PDB.read(filepath)
+
+    or from an open file handle by specifying the format explicitly:
 
     >>> from Bio import PDB
-    >>> structure = PDB.read("../Tests/PDB/1A8O.pdb.gz", fmt="pdb")
+    >>> with open("../Tests/PDB/1A8O.pdb.gz") as handle:
+    ...    structure = PDB.read(handle, fmt="pdb")
 
-    The read function supports all arguments of the individual parsers.
+    You can also pass any optional arguments to read() as you would to the
+    individual parsers:
 
     >>> from Bio import PDB
-    >>> structure = PDB.read("../Tests/PDB/1A8O.pdb", fmt="pdb", QUIET=True, PERMISSIVE=True)
+    >>> structure = PDB.read("../Tests/PDB/1A8O.pdb", QUIET=True)
     """
-    # set id to None internally for compatibility with parsers
-    id = None
-    # Try and give helpful error messages:
-    if not isinstance(fmt, str):
-        raise TypeError("Need a string for the file format")
-    if not fmt:
-        raise ValueError("Format required")
+    # Validate format or try guessing from file name.
+    if isinstance(handle, (str, PurePath)) and fmt is None:
+        fmt = _get_file_extension(handle)
+    elif fmt is None:
+        raise TypeError(
+            "Argument 'fmt' is required when reading from an open file handle."
+        )
 
-    # need to use different parser for mmtf versus pdb,cif
-    if fmt.lower() == "mmtf":
-        # MMTF needs a seperate parser as get_structure does only take 1 positional argument and does not support file handles
-        if isinstance(handle, str):
-            parser = MMTFParser()
-            return parser.get_structure(handle)
-        else:
-            raise TypeError("'%s' parser only accepts str not handle" % fmt.lower())
-    else:
-        with _as_handle_gzip(handle) as fp:
-            parser = _check_format(fmt.lower(), kwargs)
-            try:
-                structure = parser.get_structure(id, fp)
-            except ValueError:
-                raise ValueError(
-                    "Could not parse structure using %s. Did you choose the correct parser (fmt) ?"
-                    % fmt.lower()
-                )
-            # set id from header if given
-            if structure.header["idcode"] != "":
-                structure.id = structure.header["idcode"]
-            return structure
+    fmt = fmt.lower()
+    if fmt not in _fmt_to_parser:
+        raise ValueError(
+            f"'{fmt}' is not one of the following supported formats: "
+            f"{', '.join(_fmt_to_parser.keys())}"
+        )
+
+    # Instantiate parser
+    parser = _fmt_to_parser[fmt](**kwargs)
+
+    # MMTF needs a separate parser, since its get_structure() takes only one
+    # positional argument and does not support file handles.
+    if _have_mmtf and isinstance(parser, MMTFParser):
+        if not isinstance(handle, str):
+            raise TypeError(
+                "MMTFParser does not support reading from an open file handle."
+            )
+        parser = MMTFParser()
+        return parser.get_structure(handle)
+
+    # PDB and MMCIF parsers
+    with _as_handle_gzip(handle) as fp:
+        structure = parser.get_structure(None, fp)
+        # If the structure has header info and header contains an idcode
+        # try setting it to that value.
+        if hasattr(structure, "header"):
+            structure.id = structure.header.get("idcode").strip() or None
+
+    return structure
