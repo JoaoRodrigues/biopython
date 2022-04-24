@@ -147,14 +147,14 @@ def main(argv):
     # A. To find the C modules (which are in ../build/lib.*/Bio)
     # Q. Then, why ".."?
     # A. Because Martel may not be in ../build/lib.*
-    test_path = sys.path[0] or "."
-    source_path = os.path.abspath(f"{test_path}/..")
-    sys.path.insert(1, source_path)
-    build_path = os.path.abspath(
-        f"{test_path}/../build/lib.{distutils.util.get_platform()}-{sys.version_info.major}.{sys.version_info.minor}"
-    )
-    if os.access(build_path, os.F_OK):
-        sys.path.insert(1, build_path)
+    # test_path = sys.path[0] or "."
+    # source_path = os.path.abspath(f"{test_path}/..")
+    # sys.path.insert(1, source_path)
+    # build_path = os.path.abspath(
+    #    f"{test_path}/../build/lib.{distutils.util.get_platform()}-{sys.version_info.major}.{sys.version_info.minor}"
+    # )
+    # if os.access(build_path, os.F_OK):
+    #    sys.path.insert(1, build_path)
 
     # Using "export LANG=C" (which should work on Linux and similar) can
     # avoid problems detecting optional command line tools on
