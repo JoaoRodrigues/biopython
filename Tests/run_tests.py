@@ -149,15 +149,15 @@ def main(argv):
     # A. Because Martel may not be in ../build/lib.*
     test_path = sys.path[0] or "."
     source_path = os.path.abspath(f"{test_path}/..")
-    print(f"Editing sys.path to insert {source_path=}")
+    print(f"Editing sys.path to insert source_path: {source_path}")
     sys.path.insert(1, source_path)
     build_path = os.path.abspath(
         f"{test_path}/../build/lib.{distutils.util.get_platform()}-{sys.version_info.major}.{sys.version_info.minor}"
     )
     if os.access(build_path, os.F_OK):
-        print(f"Editing sys.path to insert {build_path=}")
+        print(f"Editing sys.path to insert build_path: {build_path}")
         sys.path.insert(1, build_path)
-
+    return
     # Using "export LANG=C" (which should work on Linux and similar) can
     # avoid problems detecting optional command line tools on
     # non-English OS (we may want 'command not found' in English).
