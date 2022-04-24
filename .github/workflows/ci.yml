@@ -197,7 +197,7 @@ jobs:
 
     - name: Install from source
       run: |
-        python setup.py install
+        python -m pip install .
 
     - name: Run test suite and get coverage
       run: |
@@ -233,7 +233,7 @@ jobs:
 
     - name: Install from source
       run: |
-        python setup.py install
+        python -m pip install .
 
     - name: Run test suite
       run: |
@@ -266,7 +266,7 @@ jobs:
 
     - name: Install from source
       run: |
-        python setup.py install
+        python -m pip install .
 
     - name: Run test suite
       run: |
@@ -299,7 +299,7 @@ jobs:
 
     - name: Install from source
       run: |
-        python setup.py install
+        python -m pip install .
 
     - name: Run test suite
       run: |
@@ -344,7 +344,7 @@ jobs:
 
     - name: Install from source
       run: |
-        python setup.py install
+        python -m pip install .
 
     - name: Make documentation
       run: |
