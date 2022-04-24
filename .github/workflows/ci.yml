@@ -201,6 +201,9 @@ jobs:
 
     - name: Run test suite and get coverage
       run: |
+        pwd
+        ls .
+        ls build/
         cd Tests
         rm -rf coverage.xml
         coverage run run_tests.py --offline

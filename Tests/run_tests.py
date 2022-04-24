@@ -157,7 +157,7 @@ def main(argv):
     if os.access(build_path, os.F_OK):
         print(f"Editing sys.path to insert build_path: {build_path}")
         sys.path.insert(1, build_path)
-    return
+
     # Using "export LANG=C" (which should work on Linux and similar) can
     # avoid problems detecting optional command line tools on
     # non-English OS (we may want 'command not found' in English).
