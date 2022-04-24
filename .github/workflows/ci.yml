@@ -197,12 +197,13 @@ jobs:
 
     - name: Install from source
       run: |
+        ls .
+        python -m pip uninstall -y biopython
+        rm -rf build/ dist/ biopython.egg-info
         python -m pip install .
 
     - name: Run test suite and get coverage
       run: |
-        pwd
-        ls .
         ls build/
         cd Tests
         rm -rf coverage.xml
